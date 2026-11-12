@@ -95,9 +95,41 @@ function avatarDoServico(servico) {
   return avatar;
 }
 
-function antesDaMetade(e, aba) {
-  const r = aba.getBoundingClientRect();
-  return e.clientX < r.left + r.width / 2;
+const EASE_MOVIMENTO = 'cubic-bezier(.2,.8,.2,1)';
+let arrastandoAba = null; // id da aba que está sendo arrastada
+let arrastandoFav = null; // id do destaque que está sendo arrastado
+
+// Como no navegador: a aba arrastada ocupa o lugar da aba onde foi solta.
+// Vindo da esquerda, a marca fica depois do alvo; vindo da direita, antes.
+function ladoDoAlvo(lista, idOrigem, i) {
+  const de = lista.findIndex((x) => x.id === idOrigem);
+  return de >= 0 && de < i ? 'alvo-depois' : 'alvo-antes';
+}
+function destinoAoSoltar(lista, idOrigem, i) {
+  const de = lista.findIndex((x) => x.id === idOrigem);
+  return de >= 0 && de < i ? i + 1 : i;
+}
+
+// Posição horizontal de cada item (pelo id), antes de a barra ser redesenhada.
+function capturarPosicoes(barra) {
+  const posicoes = new Map();
+  for (const c of barra.children) if (c.dataset.id) posicoes.set(c.dataset.id, c.getBoundingClientRect().left);
+  return posicoes;
+}
+
+// Anima a troca de lugar: cada item desliza da posição antiga até a nova. Item novo aparece com zoom.
+function animarReordenacao(barra, antes) {
+  for (const c of barra.children) {
+    if (!c.dataset.id) continue;
+    const x = antes.get(c.dataset.id);
+    if (x === undefined) {
+      c.animate([{ opacity: 0, transform: 'scale(0.85)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: EASE_MOVIMENTO });
+      continue;
+    }
+    const dx = x - c.getBoundingClientRect().left;
+    if (Math.abs(dx) < 1) continue;
+    c.animate([{ transform: `translateX(${dx}px)` }, { transform: 'translateX(0)' }], { duration: 340, easing: EASE_MOVIMENTO });
+  }
 }
 
 // Tira as marcas de arrastar. Com `tudo` falso, mantém o arrastar em andamento na aba (só limpa as marcas de alvo).
@@ -111,31 +143,37 @@ const limparAlvosAbas = (tudo = true) => limparAlvos('#abas .aba', tudo);
 
 function renderAbas() {
   const barra = $('abas');
+  const antes = capturarPosicoes(barra);
   barra.textContent = '';
   estado.openTabs.forEach((t, i) => {
     // Até 9 abas: Ctrl+1 … Ctrl+9 (Ctrl+Tab percorre todas).
     const dica = i < 9 ? ` · Ctrl+${i + 1}` : '';
     const aba = el('div', { className: 'aba' + (t.id === estado.activeId ? ' ativa' : ''), title: (t.title || t.name) + dica });
+    aba.dataset.id = t.id;
     aba.addEventListener('click', () => chamar(window.dm.selectTab(t.id)));
     // Arrastar para reordenar, como no navegador. A metade da aba onde o mouse cai define antes ou depois.
     aba.draggable = true;
     aba.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('text/plain', t.id);
       e.dataTransfer.effectAllowed = 'move';
+      arrastandoAba = t.id;
       aba.classList.add('arrastando');
     });
-    aba.addEventListener('dragend', () => limparAlvosAbas());
+    aba.addEventListener('dragend', () => {
+      arrastandoAba = null;
+      limparAlvosAbas();
+    });
     aba.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       limparAlvosAbas(false);
-      aba.classList.add(antesDaMetade(e, aba) ? 'alvo-antes' : 'alvo-depois');
+      aba.classList.add(ladoDoAlvo(estado.openTabs, arrastandoAba, i));
     });
     aba.addEventListener('dragleave', () => aba.classList.remove('alvo-antes', 'alvo-depois'));
     aba.addEventListener('drop', (e) => {
       e.preventDefault();
       const origem = e.dataTransfer.getData('text/plain');
-      const destino = i + (antesDaMetade(e, aba) ? 0 : 1);
+      const destino = destinoAoSoltar(estado.openTabs, origem, i);
       limparAlvosAbas();
       if (origem) chamar(window.dm.moveTab(origem, destino));
     });
@@ -151,6 +189,7 @@ function renderAbas() {
     aba.appendChild(x);
     barra.appendChild(aba);
   });
+  animarReordenacao(barra, antes);
   $('vazio').classList.toggle('hidden', estado.openTabs.length > 0);
 }
 
@@ -192,11 +231,13 @@ function renderMenuNova() {
 
 function renderFavoritas() {
   const barra = $('favoritas');
+  const antes = capturarPosicoes(barra);
   barra.textContent = '';
   for (const [i, f] of estado.favoritas.entries()) {
     // A bolinha mostra o serviço (verde WhatsApp, azul Telegram); a conta aberta aparece com brilho.
     const servico = f.service === 'telegram' ? 'telegram' : 'whatsapp';
     const chip = el('button', { className: 'fav-chip ' + servico + (f.open ? ' aberta' : ''), title: f.accountName }, '★ ' + f.nome);
+    chip.dataset.id = f.id;
     chip.addEventListener('click', () => chamar(window.dm.openFavorite(f.id)));
     // Botão direito libera o destaque (sai da faixa e de Opções › Destaques; a conversa não é afetada).
     chip.addEventListener('contextmenu', (e) => {
@@ -208,27 +249,32 @@ function renderFavoritas() {
     chip.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('application/x-dm-destaque', f.id);
       e.dataTransfer.effectAllowed = 'move';
+      arrastandoFav = f.id;
       chip.classList.add('arrastando');
     });
-    chip.addEventListener('dragend', () => limparAlvos('#favoritas .fav-chip'));
+    chip.addEventListener('dragend', () => {
+      arrastandoFav = null;
+      limparAlvos('#favoritas .fav-chip');
+    });
     chip.addEventListener('dragover', (e) => {
       if (!e.dataTransfer.types.includes('application/x-dm-destaque')) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       limparAlvos('#favoritas .fav-chip', false);
-      chip.classList.add(antesDaMetade(e, chip) ? 'alvo-antes' : 'alvo-depois');
+      chip.classList.add(ladoDoAlvo(estado.favoritas, arrastandoFav, i));
     });
     chip.addEventListener('dragleave', () => chip.classList.remove('alvo-antes', 'alvo-depois'));
     chip.addEventListener('drop', (e) => {
       if (!e.dataTransfer.types.includes('application/x-dm-destaque')) return;
       e.preventDefault();
       const origem = e.dataTransfer.getData('application/x-dm-destaque');
-      const destino = i + (antesDaMetade(e, chip) ? 0 : 1);
+      const destino = destinoAoSoltar(estado.favoritas, origem, i);
       limparAlvos('#favoritas .fav-chip');
       if (origem) chamar(window.dm.moveFavorite(origem, destino));
     });
     barra.appendChild(chip);
   }
+  animarReordenacao(barra, antes);
   // A linha só existe com algum destaque (o main.js reserva a altura pelo mesmo critério).
   $('faixa-favoritas').classList.toggle('hidden', !estado.favoritas.length);
   requestAnimationFrame(atualizarSetasFavoritas);
