@@ -35,10 +35,12 @@ Versão atual: **0.1.8** · [Releases](https://github.com/mpjsilva/DualMessenger
 | **Destaques** | Favoritos genéricos | Conversas do WhatsApp e do Telegram numa faixa abaixo das abas. A bolinha mostra o serviço (verde no WhatsApp, azul no Telegram) e acende quando a conta está aberta |
 | **Mensagens de voz** | Só tocar o áudio | Botão **Transcrever**: o texto aparece aos poucos, a cada 15 segundos de áudio, e tudo roda no computador |
 | **Userscripts** | Extensão à parte, uma por navegador | Arquivos `.user.js` importados direto nas contas, com só as funções `GM_*` que cada script declara |
-| **Teclado** | Atalhos fixos do navegador | Ctrl+Tab, Ctrl+1 a Ctrl+9 e Esc para trocar de aba e fechar as Opções |
+| **Teclado** | Atalhos fixos do navegador | Ctrl+Tab, Ctrl+1 a Ctrl+9, Ctrl+R e Esc para trocar, recarregar e fechar as Opções |
+| **Abas** | Reordenação por arrastar com prévia ao vivo: as outras abas deslizam para abrir espaço | Ctrl+1 a Ctrl+9 seguem a ordem da barra |
 
 E mais:
-- **Tema claro, escuro ou automático**, em **Opções › Aparência**.
+- **Tema claro, escuro ou automático**, em **Opções › Aparência** ou pelo botão lua/sol da barra. O tema vale também para as páginas das contas, via `nativeTheme` do Electron.
+- **Notificações**: clicar numa notificação de WhatsApp ou Telegram traz a janela para frente e seleciona a conta que a enviou.
 - **Manual no próprio app**, em **Opções › Manual**, e **Créditos** com as licenças de cada componente.
 - **Ícone no menu de aplicativos**: ao abrir, o app grava o ícone e um atalho em `~/.local/share`.
 
@@ -94,11 +96,13 @@ npm start
 | Janela | Ctrl + Tab / Ctrl + Shift + Tab | Próxima ou anterior aba (volta no fim) |
 | Janela | Ctrl + 1 a Ctrl + 9 | Vai direto para a aba de mesmo número (a ordem é a da barra) |
 | Janela | Ctrl + R | Recarrega a aba da frente |
-| Barra | Arrastar uma aba | Reordena as abas; a metade onde você solta define antes ou depois |
+| Barra | Arrastar uma aba | Reordena; as outras abas deslizam enquanto você arrasta, e a aba ocupa o lugar onde for solta |
 | Destaques | Botão direito no destaque | Libera o destaque (a conversa não é afetada) |
-| Destaques | Arrastar um destaque | Reordena os destaques |
-| Barra | **+** | Nova conta: WhatsApp ou Telegram, ou uma conta salva |
+| Destaques | Arrastar um destaque | Reordena a faixa e Opções › Destaques, com a mesma prévia ao vivo |
 | Barra | **★** | Abre Opções › Destaques |
+| Barra | Lua / sol | Alterna o tema claro e escuro (lua no claro, sol no escuro) |
+| Barra | **</>** | Abre Opções › Userscripts |
+| Barra | **+** | Nova conta: WhatsApp ou Telegram, ou uma conta salva |
 | Barra | Ícone de ajustes | Abre Opções |
 | Opções | Esc | Fecha Opções |
 | Mensagem de voz | **Transcrever** | Transcreve no computador, em trechos de 15 segundos |
@@ -115,7 +119,10 @@ npm start
 - `src/main.js`: janela, abas, uma partição por conta e IPC.
 - `src/motor.js`, `src/userscripts.js`, `src/gm-ipc.js`: userscripts e a API `GM_*`, sempre com token e permissão de `@grant`.
 - `src/transcricao*.js`, `src/pagina-whatsapp.js`, `src/pagina-telegram.js`, `src/preload-transcricao.js`: transcrição local.
-- `src/atalhos.js`: atalhos de teclado das abas.
+- `src/atalhos.js`: atalhos de teclado das abas (Ctrl+Tab, Ctrl+1…9, Ctrl+R).
+- `src/abas.js`: reordenação das abas (`moverAba`), testada em `tests/abas.test.js`.
+- `src/pagina-notificacao.js`: troca `Notification` na página para avisar o app quando uma notificação é clicada.
+- `ui/app.js`: arrastar e prévia das abas e dos destaques (`atualizarPrevia`, `animarReordenacao`); a barra inteira recebe o arrasto.
 - `src/store.js`: JSON com escrita atômica.
 - `ui/`: barra de abas e Opções, em HTML, CSS e JavaScript puros.
 - `docs/prints/`: as imagens deste README.
@@ -143,6 +150,9 @@ WHISPER_BIN=... MODELO=... AUDIO=... node tests/smoke-transcricao.js   # WAV 16 
 - Os destaques dependem da lista de conversas de cada site, lida pelos seletores de `src/conversas.js`. Grupos e conversas fora da lista carregada podem não ser encontrados.
 - O instalador do **Preparar** conhece só o `dnf`. Em outras distribuições, a instalação das ferramentas é manual.
 - O ícone no GNOME (dock, Alt+Tab, Atividades) não foi testado numa área de trabalho real.
+- O aviso de clique em notificação cobre as notificações criadas pela página. Notificações enviadas por service worker (push em segundo plano) não passam por ele.
+- O tema das contas depende de cada site seguir o modo claro/escuro do sistema. No Electron isso foi verificado; nas contas, o resultado depende do site.
+- A arrastar com prévia e a animação foram testados por lógica e build; o gesto na janela ainda deve ser conferido em cada versão.
 
 ## Agradecimentos
 
