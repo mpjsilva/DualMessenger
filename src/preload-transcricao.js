@@ -8,6 +8,12 @@ const { ipcRenderer } = require('electron');
 const SITES_TRANSCRICAO = ['web.whatsapp.com', 'web.telegram.org'];
 
 if (SITES_TRANSCRICAO.includes(location.hostname)) {
+  // Clique numa notificação (ver src/pagina-notificacao.js): o processo principal traz a conta para a frente.
+  window.addEventListener('message', (e) => {
+    if (e.source !== window || e.origin !== location.origin) return;
+    if (e.data && e.data.canal === 'dm-notificacao:clique') ipcRenderer.send('conta:focar');
+  });
+
   // Texto parcial: a cada trecho transcrito, o processo principal manda o texto até ali; a página mostra.
   ipcRenderer.on('transcricao:parcial', (_e, d) => {
     if (!d || !d.reqId) return;

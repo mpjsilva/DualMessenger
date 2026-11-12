@@ -20,6 +20,7 @@ const { acaoAtalho, proximoIndice } = require('./atalhos');
 const { criarServicoTranscricao } = require('./transcricao-servico');
 const { criarInstalador } = require('./transcricao-instalar');
 const { ARQUIVO_ICONE, iconeDoApp } = require('./recursos');
+const { moverAba } = require('./abas');
 const { integrarSistema, ID_APP } = require('./sistema-linux');
 const { linkPermitido } = require('./links');
 const { SERVICOS_COM_LISTA, scriptLerLista, scriptAbrirConversa } = require('./conversas');
@@ -27,6 +28,8 @@ const { SERVICOS_COM_LISTA, scriptLerLista, scriptAbrirConversa } = require('./c
 // Script que põe o botão "Transcrever" nas mensagens de voz (roda na página do WhatsApp).
 const PAGINA_WHATSAPP = fs.readFileSync(path.join(__dirname, 'pagina-whatsapp.js'), 'utf8');
 const PAGINA_TELEGRAM = fs.readFileSync(path.join(__dirname, 'pagina-telegram.js'), 'utf8');
+// Clique numa notificação da página: traz a janela e abre a conta que a mandou.
+const PAGINA_NOTIFICACAO = fs.readFileSync(path.join(__dirname, 'pagina-notificacao.js'), 'utf8');
 // Sites que podem pedir transcrição pela ponte (ver src/preload-transcricao.js).
 const ORIGENS_TRANSCRICAO = ['https://web.whatsapp.com/', 'https://web.telegram.org/'];
 
@@ -201,6 +204,7 @@ async function openAccount(accountId, selecionar = true) {
     scripts.injetar(wc).catch(() => {});
     if (acc.service === 'whatsapp') wc.executeJavaScript(PAGINA_WHATSAPP).catch(() => {});
     if (acc.service === 'telegram') wc.executeJavaScript(PAGINA_TELEGRAM).catch(() => {});
+    wc.executeJavaScript(PAGINA_NOTIFICACAO).catch(() => {});
   });
   wc.loadURL(service.url).catch(() => {});
   if (!win.contentView.children.includes(view)) win.contentView.addChildView(view);
@@ -345,6 +349,22 @@ function registerIpc() {
   handle('account:delete', (id) => deleteAccount(id));
   handle('tab:select', (id) => selectTab(id));
   handle('tab:close', (id) => closeTab(id));
+  // A página avisa (pela ponte preload-transcricao.js) que uma notificação foi clicada.
+  ipcMain.on('conta:focar', (e) => {
+    const id = [...tabs.keys()].find((k) => tabs.get(k).view.webContents.id === e.sender.id);
+    if (!id || !win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    panelOpen = false;
+    listaFrente = null;
+    selectTab(id);
+  });
+  handle('tab:move', (id, destino) => {
+    state.openTabs = moverAba(state.openTabs, id, destino);
+    saveState();
+    broadcast();
+  });
   handle('menu:set', (open) => {
     menuOpen = !!open;
     layout();
@@ -384,6 +404,13 @@ function registerIpc() {
     state.favoritas = state.favoritas.filter((f) => f.id !== id);
     saveState();
     layout(); // se for o último destaque, a linha some
+    broadcast();
+  });
+  // Arrastar um destaque na faixa: a ordem nova vale para a faixa e para Opções › Destaques.
+  handle('fav:move', (id, destino) => {
+    const ordem = moverAba(state.favoritas.map((f) => f.id), id, destino);
+    state.favoritas = ordem.map((i) => state.favoritas.find((f) => f.id === i));
+    saveState();
     broadcast();
   });
   handle('fav:open', async (id) => {

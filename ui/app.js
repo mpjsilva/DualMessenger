@@ -95,6 +95,20 @@ function avatarDoServico(servico) {
   return avatar;
 }
 
+function antesDaMetade(e, aba) {
+  const r = aba.getBoundingClientRect();
+  return e.clientX < r.left + r.width / 2;
+}
+
+// Tira as marcas de arrastar. Com `tudo` falso, mantém o arrastar em andamento na aba (só limpa as marcas de alvo).
+function limparAlvos(seletor, tudo = true) {
+  for (const a of document.querySelectorAll(seletor)) {
+    a.classList.remove('alvo-antes', 'alvo-depois');
+    if (tudo) a.classList.remove('arrastando');
+  }
+}
+const limparAlvosAbas = (tudo = true) => limparAlvos('#abas .aba', tudo);
+
 function renderAbas() {
   const barra = $('abas');
   barra.textContent = '';
@@ -103,6 +117,28 @@ function renderAbas() {
     const dica = i < 9 ? ` · Ctrl+${i + 1}` : '';
     const aba = el('div', { className: 'aba' + (t.id === estado.activeId ? ' ativa' : ''), title: (t.title || t.name) + dica });
     aba.addEventListener('click', () => chamar(window.dm.selectTab(t.id)));
+    // Arrastar para reordenar, como no navegador. A metade da aba onde o mouse cai define antes ou depois.
+    aba.draggable = true;
+    aba.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', t.id);
+      e.dataTransfer.effectAllowed = 'move';
+      aba.classList.add('arrastando');
+    });
+    aba.addEventListener('dragend', () => limparAlvosAbas());
+    aba.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      limparAlvosAbas(false);
+      aba.classList.add(antesDaMetade(e, aba) ? 'alvo-antes' : 'alvo-depois');
+    });
+    aba.addEventListener('dragleave', () => aba.classList.remove('alvo-antes', 'alvo-depois'));
+    aba.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const origem = e.dataTransfer.getData('text/plain');
+      const destino = i + (antesDaMetade(e, aba) ? 0 : 1);
+      limparAlvosAbas();
+      if (origem) chamar(window.dm.moveTab(origem, destino));
+    });
     aba.appendChild(avatarDoServico(t.service));
     aba.appendChild(el('span', { className: 'nome' }, t.name));
     if (t.badge > 0) aba.appendChild(el('span', { className: 'badge' }, String(t.badge)));
@@ -157,11 +193,40 @@ function renderMenuNova() {
 function renderFavoritas() {
   const barra = $('favoritas');
   barra.textContent = '';
-  for (const f of estado.favoritas) {
+  for (const [i, f] of estado.favoritas.entries()) {
     // A bolinha mostra o serviço (verde WhatsApp, azul Telegram); a conta aberta aparece com brilho.
     const servico = f.service === 'telegram' ? 'telegram' : 'whatsapp';
     const chip = el('button', { className: 'fav-chip ' + servico + (f.open ? ' aberta' : ''), title: f.accountName }, '★ ' + f.nome);
     chip.addEventListener('click', () => chamar(window.dm.openFavorite(f.id)));
+    // Botão direito libera o destaque (sai da faixa e de Opções › Destaques; a conversa não é afetada).
+    chip.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      chamar(window.dm.removeFavorite(f.id));
+    });
+    // Arrastar para reordenar. Só aceita outro destaque (o tipo próprio evita confundir com as abas).
+    chip.draggable = true;
+    chip.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('application/x-dm-destaque', f.id);
+      e.dataTransfer.effectAllowed = 'move';
+      chip.classList.add('arrastando');
+    });
+    chip.addEventListener('dragend', () => limparAlvos('#favoritas .fav-chip'));
+    chip.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer.types.includes('application/x-dm-destaque')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      limparAlvos('#favoritas .fav-chip', false);
+      chip.classList.add(antesDaMetade(e, chip) ? 'alvo-antes' : 'alvo-depois');
+    });
+    chip.addEventListener('dragleave', () => chip.classList.remove('alvo-antes', 'alvo-depois'));
+    chip.addEventListener('drop', (e) => {
+      if (!e.dataTransfer.types.includes('application/x-dm-destaque')) return;
+      e.preventDefault();
+      const origem = e.dataTransfer.getData('application/x-dm-destaque');
+      const destino = i + (antesDaMetade(e, chip) ? 0 : 1);
+      limparAlvos('#favoritas .fav-chip');
+      if (origem) chamar(window.dm.moveFavorite(origem, destino));
+    });
     barra.appendChild(chip);
   }
   // A linha só existe com algum destaque (o main.js reserva a altura pelo mesmo critério).
