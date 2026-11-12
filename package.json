@@ -1,7 +1,7 @@
 {
   "name": "dual-messenger-app",
   "productName": "Dual Messenger",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Vários WhatsApp Web e Telegram Web em abas isoladas, com transcrição local de mensagens de voz e userscripts.",
   "main": "src/main.js",
   "author": "mpjsilva",
@@ -14,7 +14,8 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test tests/*.test.js",
-    "dist": "electron-builder --linux AppImage"
+    "dist": "electron-builder --linux AppImage",
+    "dist:win": "electron-builder --win nsis --x64 --config.directories.output=dist/win"
   },
   "build": {
     "appId": "local.dualmessenger.app",
@@ -31,7 +32,27 @@
       "ui/**/*",
       "assets/**/*",
       "package.json"
-    ]
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "DualMessenger-Setup-${version}.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "shortcutName": "Dual Messenger"
+    }
   },
   "devDependencies": {
     "electron": "45.3.0",

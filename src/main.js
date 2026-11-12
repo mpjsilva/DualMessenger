@@ -577,6 +577,8 @@ function createWindow() {
 if (process.env.DM_DATA_DIR) app.setPath('userData', process.env.DM_DATA_DIR);
 // Liga a janela ao atalho .desktop (Wayland e X11): é por ele que o sistema acha o ícone. Tem que vir antes do ready.
 if (process.platform === 'linux') app.setDesktopName(`${ID_APP}.desktop`);
+// No Windows, as notificações (toasts) só aparecem com o mesmo AppUserModelID do instalador (appId do package.json).
+if (process.platform === 'win32') app.setAppUserModelId('local.dualmessenger.app');
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null); // sem a barra padrão do Electron (File, Edit, View…)

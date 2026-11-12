@@ -25,7 +25,7 @@ O Dual Messenger abre várias contas de WhatsApp Web e Telegram Web numa janela 
 
 Este é um **projeto de estudo de UI/UX**. A interface foi desenhada e refeita para praticar design de interação: abas, faixa de destaques, estados da transcrição, configurações em painel lateral e temas.
 
-Versão atual: **0.1.9** · [Releases](https://github.com/mpjsilva/DualMessenger/releases) · [Desenvolvimento](#para-desenvolvedores)
+Versão atual: **0.1.11** · [Releases](https://github.com/mpjsilva/DualMessenger/releases) · [Desenvolvimento](#para-desenvolvedores)
 
 ## Principais diferenciais
 
@@ -56,15 +56,22 @@ E mais:
 
 ### Pelo AppImage (recomendado)
 
-1. Baixe `DualMessenger-0.1.9.AppImage` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (está no arquivo `.sha256` ao lado).
+1. Baixe `DualMessenger-0.1.11.AppImage` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (está no arquivo `.sha256` ao lado).
 2. Torne o arquivo executável e abra:
 
 ```bash
-chmod +x DualMessenger-0.1.9.AppImage
-./DualMessenger-0.1.9.AppImage
+chmod +x DualMessenger-0.1.11.AppImage
+./DualMessenger-0.1.11.AppImage
 ```
 
-> Em distribuições recentes, o AppImage pede o FUSE 2 (pacote `fuse-libs` no Fedora, `libfuse2` no Debian e no Ubuntu). Sem ele, rode com `./DualMessenger-0.1.9.AppImage --appimage-extract-and-run`.
+> Em distribuições recentes, o AppImage pede o FUSE 2 (pacote `fuse-libs` no Fedora, `libfuse2` no Debian e no Ubuntu). Sem ele, rode com `./DualMessenger-0.1.11.AppImage --appimage-extract-and-run`.
+
+### Windows 10 e 11
+
+1. Baixe `DualMessenger-Setup-0.1.11.exe` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (arquivo `.sha256` ao lado).
+2. Execute o instalador. Ele instala para todos os usuários e pede permissão de administrador.
+
+> A versão para Windows ainda não tem a transcrição de mensagens de voz: o botão **Preparar** só funciona no Linux. Os demais recursos (contas, destaques, notificações, userscripts) funcionam.
 
 O AppImage não inclui o whisper.cpp, o modelo de voz nem o ffmpeg. O botão **Preparar**, descrito abaixo, instala o que falta (inclusive o ffmpeg), compila o whisper.cpp e baixa o modelo.
 
