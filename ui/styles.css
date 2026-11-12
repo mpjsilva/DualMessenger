@@ -155,7 +155,7 @@ html.menu-aberto, html.menu-aberto body { background: transparent !important; }
 }
 .aba:hover { background: var(--vidro-forte); color: var(--texto); }
 .aba:active { transform: scale(0.98); }
-.aba.arrastando { opacity: 0.5; transform: scale(0.96); box-shadow: var(--sombra); }
+.aba.arrastando { opacity: 0.5; scale: 0.96; box-shadow: var(--sombra); }
 .aba.alvo-antes::before,
 .aba.alvo-depois::after {
   content: "";
@@ -317,8 +317,8 @@ html.menu-aberto, html.menu-aberto body { background: transparent !important; }
 .fav-chip:hover { background: var(--vidro-forte); }
 .fav-chip.aberta::before { opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--verde) 18%, transparent); }
 .fav-chip.telegram.aberta::before { box-shadow: 0 0 0 3px color-mix(in srgb, var(--telegram) 22%, transparent); }
-.fav-chip { transition: background 0.2s var(--ease), transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s var(--ease); }
-.fav-chip.arrastando { opacity: 0.5; transform: scale(0.96); }
+.fav-chip { transition: background 0.2s var(--ease), transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s var(--ease); }
+.fav-chip.arrastando { opacity: 0.5; scale: 0.96; }
 .fav-chip.alvo-antes { box-shadow: inset 3px 0 0 var(--acento); }
 .fav-chip.alvo-depois { box-shadow: inset -3px 0 0 var(--acento); }
 

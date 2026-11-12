@@ -1,7 +1,7 @@
 {
   "name": "dual-messenger-app",
   "productName": "Dual Messenger",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Vários WhatsApp Web e Telegram Web em abas isoladas, com transcrição local de mensagens de voz e userscripts.",
   "main": "src/main.js",
   "author": "mpjsilva",

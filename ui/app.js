@@ -110,6 +110,29 @@ function destinoAoSoltar(lista, idOrigem, i) {
   return de >= 0 && de < i ? i + 1 : i;
 }
 
+// Prévia ao vivo: enquanto arrasta, os outros itens deslizam para abrir espaço e o arrastado vai
+// até o lugar onde ficará. A lista do DOM não muda até soltar (aí a barra é redesenhada).
+function preverReordenacao(seletorBarra, lista, idOrigem, i) {
+  const barra = document.querySelector(seletorBarra);
+  const elems = [...barra.children].filter((c) => c.dataset.id);
+  const ids = elems.map((c) => c.dataset.id);
+  const de = ids.indexOf(idOrigem);
+  if (de < 0) return;
+  const d = destinoAoSoltar(lista, idOrigem, i);
+  const nova = ids.slice();
+  nova.splice(de, 1);
+  nova.splice(de < d ? d - 1 : d, 0, idOrigem);
+  const posicoes = elems.map((c) => c.offsetLeft);
+  for (const c of elems) {
+    const dx = posicoes[nova.indexOf(c.dataset.id)] - posicoes[ids.indexOf(c.dataset.id)];
+    c.style.transform = dx ? `translateX(${dx}px)` : '';
+  }
+}
+
+function limparPrevia(seletorBarra) {
+  for (const c of document.querySelectorAll(seletorBarra + ' > *')) c.style.transform = '';
+}
+
 // Posição horizontal de cada item (pelo id), antes de a barra ser redesenhada.
 function capturarPosicoes(barra) {
   const posicoes = new Map();
@@ -161,13 +184,12 @@ function renderAbas() {
     });
     aba.addEventListener('dragend', () => {
       arrastandoAba = null;
-      limparAlvosAbas();
+      limparPrevia('#abas');
     });
     aba.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      limparAlvosAbas(false);
-      aba.classList.add(ladoDoAlvo(estado.openTabs, arrastandoAba, i));
+      preverReordenacao('#abas', estado.openTabs, arrastandoAba, i);
     });
     aba.addEventListener('dragleave', () => aba.classList.remove('alvo-antes', 'alvo-depois'));
     aba.addEventListener('drop', (e) => {
@@ -254,14 +276,13 @@ function renderFavoritas() {
     });
     chip.addEventListener('dragend', () => {
       arrastandoFav = null;
-      limparAlvos('#favoritas .fav-chip');
+      limparPrevia('#favoritas');
     });
     chip.addEventListener('dragover', (e) => {
       if (!e.dataTransfer.types.includes('application/x-dm-destaque')) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      limparAlvos('#favoritas .fav-chip', false);
-      chip.classList.add(ladoDoAlvo(estado.favoritas, arrastandoFav, i));
+      preverReordenacao('#favoritas', estado.favoritas, arrastandoFav, i);
     });
     chip.addEventListener('dragleave', () => chip.classList.remove('alvo-antes', 'alvo-depois'));
     chip.addEventListener('drop', (e) => {
