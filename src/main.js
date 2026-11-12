@@ -228,6 +228,12 @@ function atalhoDaTecla(event, input) {
   if (!acao) return;
   event.preventDefault();
   if (acao.tipo === 'ir') return selectTab(state.openTabs[acao.indice]);
+  // Ctrl+R: recarrega a aba da frente (é a saída quando a página trava).
+  if (acao.tipo === 'recarregar') {
+    const entry = activeId && tabs.get(activeId);
+    if (entry) entry.view.webContents.reload();
+    return;
+  }
   const atual = state.openTabs.indexOf(activeId);
   const indice = proximoIndice(atual, state.openTabs.length, acao.tipo === 'proxima' ? 1 : -1);
   if (indice >= 0) selectTab(state.openTabs[indice]);
@@ -287,7 +293,10 @@ async function deleteAccount(accountId) {
   if (!acc) return;
   closeTab(accountId);
   state.accounts = state.accounts.filter((a) => a.id !== accountId);
+  // Os destaques dessa conta somem junto (senão apontam para uma conta que não existe mais).
+  state.favoritas = state.favoritas.filter((f) => f.accountId !== accountId);
   saveState();
+  layout(); // se não sobrar destaque, a linha dos destaques some
   // Apaga os dados da conta (login, mensagens em cache). Irreversível.
   await session.fromPartition(acc.partition).clearStorageData();
   broadcast();

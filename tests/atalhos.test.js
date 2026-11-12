@@ -17,6 +17,12 @@ test('Ctrl+1 a Ctrl+9 escolhem a aba de mesmo número', () => {
   assert.deepEqual(acaoAtalho(tecla('9'), 9), { tipo: 'ir', indice: 8 });
 });
 
+test('Ctrl+R recarrega a aba da frente', () => {
+  assert.deepEqual(acaoAtalho(tecla('r'), 2), { tipo: 'recarregar' });
+  assert.deepEqual(acaoAtalho(tecla('R', { shift: true }), 2), { tipo: 'recarregar' });
+  assert.equal(acaoAtalho(tecla('r'), 0), null);
+});
+
 test('Ctrl+número maior que a quantidade de abas não faz nada', () => {
   assert.equal(acaoAtalho(tecla('4'), 2), null);
   assert.equal(acaoAtalho(tecla('9'), 0), null);

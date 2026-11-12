@@ -4,6 +4,7 @@
 // e devolve a ação, ou null quando a tecla não é um atalho do app.
 //   Ctrl+Tab / Ctrl+Shift+Tab: próxima / anterior aba (com volta no fim)
 //   Ctrl+1 … Ctrl+9: vai para a aba de mesmo número (se existir)
+//   Ctrl+R: recarrega a aba da frente
 
 function acaoAtalho(input, totalAbas) {
   if (!input || input.type !== 'keyDown') return null;
@@ -12,6 +13,10 @@ function acaoAtalho(input, totalAbas) {
 
   if (input.key === 'Tab') {
     return { tipo: input.shift ? 'anterior' : 'proxima' };
+  }
+
+  if (input.key === 'r' || input.key === 'R') {
+    return { tipo: 'recarregar' };
   }
 
   if (/^[1-9]$/.test(input.key)) {
