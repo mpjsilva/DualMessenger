@@ -1,10 +1,13 @@
 'use strict';
 
-// Prepara a transcrição dentro do próprio app (botão em Opções › Transcrição):
-// instala as ferramentas que faltam (pedindo a senha pela janela do sistema),
+// Prepara a transcrição dentro do próprio app (botão em Opções › Transcrição).
+// Linux: instala as ferramentas que faltam (pedindo a senha pela janela do sistema),
 // compila o whisper.cpp, baixa o modelo e grava transcricao.json.
+// Windows: baixa binários prontos (whisper-cli.exe e ffmpeg.exe), confere o SHA-256 de cada zip,
+// extrai só o necessário e baixa o modelo. Nada é compilado.
 // Tudo fica na pasta de dados do app. Quem já tiver algo pronto não baixa de novo.
 
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -18,7 +21,21 @@ const URL_WHISPER = 'https://github.com/ggml-org/whisper.cpp.git';
 const URL_MODELO = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin';
 const MODELO_MINIMO = 400 * 1000 * 1000; // ggml-small tem ~488 MB; sem tamanho informado, menos que isso é incompleto
 
-// Ferramentas do sistema e o pacote Fedora que as fornece.
+// Binários do Windows (x64), fixados em versão. O SHA-256 é o do arquivo oficial publicado no GitHub.
+// whisper.cpp v1.8.2 é a última release com binário pronto para Windows (a v1.9.x só traz código-fonte).
+// FFmpeg: build LGPL compartilhada da série 8.1 (BtbN/FFmpeg-Builds).
+const FONTES_WINDOWS = {
+  whisper: {
+    url: 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.2/whisper-bin-x64.zip',
+    sha256: 'b1514ebc099765e39fa37eb780b92a140a94c86bb0b3b3d98226b38825979732',
+  },
+  ffmpeg: {
+    url: 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-12-15-40/ffmpeg-n8.1.3-35-gf1acb0a266-win64-lgpl-shared-8.1.zip',
+    sha256: 'bb6eedd1978549c84e8dff7b72c885df090db6a6ee1de44e76c8855babea495c',
+  },
+};
+
+// Ferramentas do sistema e o pacote Fedora que as fornece (só Linux).
 const FERRAMENTAS = [
   { cmd: 'git', args: ['--version'], pacote: 'git' },
   { cmd: 'cmake', args: ['--version'], pacote: 'cmake' },
@@ -26,14 +43,21 @@ const FERRAMENTAS = [
   { cmd: 'ffmpeg', args: ['-version'], pacote: 'ffmpeg' },
 ];
 
-function caminhos(dataDir, appDir) {
+function caminhos(dataDir, appDir, plataforma = process.platform) {
   const whisperDir = path.join(dataDir, 'whisper.cpp');
+  const ferramentas = path.join(dataDir, 'ferramentas');
+  const win = plataforma === 'win32';
   return {
     whisperDir,
     buildDir: path.join(whisperDir, 'build'),
-    whisperBin: path.join(whisperDir, 'build', 'bin', 'whisper-cli'),
+    whisperBin: win
+      ? path.join(ferramentas, 'whisper', 'whisper-cli.exe')
+      : path.join(whisperDir, 'build', 'bin', 'whisper-cli'),
     modelo: path.join(dataDir, 'modelos', MODELO_PADRAO),
-    ffmpegDoProjeto: path.join(appDir, 'vendor', 'bin', 'ffmpeg'),
+    ffmpegDoProjeto: win
+      ? path.join(ferramentas, 'ffmpeg', 'ffmpeg.exe')
+      : path.join(appDir, 'vendor', 'bin', 'ffmpeg'),
+    ferramentas,
     config: path.join(dataDir, 'transcricao.json'),
   };
 }
@@ -90,8 +114,62 @@ async function baixarModelo(destino, aoProgresso, url = URL_MODELO) {
   fs.renameSync(parcial, destino);
 }
 
-function criarInstalador({ dataDir, appDir }) {
-  const c = caminhos(dataDir, appDir);
+// Baixa um arquivo e confere o SHA-256 antes de dar o nome final. Arquivo com hash diferente é apagado.
+async function baixarVerificado(url, destino, sha256, aoProgresso = () => {}) {
+  const res = await fetch(url);
+  if (!res.ok || !res.body) throw new Error(`não consegui baixar ${path.basename(destino)} (HTTP ${res.status})`);
+  const total = Number(res.headers.get('content-length')) || 0;
+  const parcial = `${destino}.parcial`;
+  const saida = fs.createWriteStream(parcial);
+  const hash = crypto.createHash('sha256');
+  let lido = 0;
+  for await (const parte of Readable.fromWeb(res.body)) {
+    hash.update(parte);
+    if (!saida.write(parte)) await once(saida, 'drain');
+    lido += parte.length;
+    if (total) aoProgresso(lido / total);
+  }
+  await new Promise((resolve, reject) => saida.end((err) => (err ? reject(err) : resolve())));
+  if (hash.digest('hex') !== sha256) {
+    fs.rmSync(parcial, { force: true });
+    throw new Error(`${path.basename(destino)} não confere (SHA-256 diferente); tente de novo`);
+  }
+  fs.renameSync(parcial, destino);
+}
+
+// Descompacta com o tar.exe do Windows 10/11 (aceita zip). Sem dependências extras.
+function extrairZip(zip, destino) {
+  fs.rmSync(destino, { recursive: true, force: true });
+  fs.mkdirSync(destino, { recursive: true });
+  const r = spawnSync('tar', ['-xf', zip, '-C', destino], { stdio: 'ignore' });
+  if (r.error || r.status !== 0) throw new Error(`não consegui descompactar ${path.basename(zip)}`);
+}
+
+// Primeira pasta (dentro de dir) que contém um arquivo com esse nome.
+function acharPasta(dir, nomeArquivo) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      const achou = acharPasta(full, nomeArquivo);
+      if (achou) return achou;
+    } else if (e.name.toLowerCase() === nomeArquivo.toLowerCase()) {
+      return dir;
+    }
+  }
+  return null;
+}
+
+// Copia para destino só os arquivos que passam no filtro (executável e DLLs necessárias).
+function copiarArquivos(origem, destino, filtro) {
+  fs.mkdirSync(destino, { recursive: true });
+  for (const nome of fs.readdirSync(origem)) {
+    if (filtro(nome)) fs.copyFileSync(path.join(origem, nome), path.join(destino, nome));
+  }
+}
+
+function criarInstalador({ dataDir, appDir, plataforma = process.platform, fontesWindows = FONTES_WINDOWS }) {
+  const c = caminhos(dataDir, appDir, plataforma);
+  const windows = plataforma === 'win32';
   let ffmpeg = null; // escolhido uma vez e atualizado depois de instalar
 
   function escolherFfmpeg() {
@@ -99,7 +177,7 @@ function criarInstalador({ dataDir, appDir }) {
       try { fs.chmodSync(c.ffmpegDoProjeto, 0o755); } catch { /* sem permissão para mudar: testa do jeito que está */ }
     }
     if (temFerramenta(c.ffmpegDoProjeto, ['-version'])) return c.ffmpegDoProjeto;
-    if (temFerramenta('ffmpeg', ['-version'])) return 'ffmpeg';
+    if (!windows && temFerramenta('ffmpeg', ['-version'])) return 'ffmpeg';
     return null;
   }
 
@@ -112,6 +190,7 @@ function criarInstalador({ dataDir, appDir }) {
   }
 
   function ferramentasFaltando() {
+    if (windows) return []; // no Windows as ferramentas vêm do próprio download, não de pacotes do sistema
     return FERRAMENTAS.filter((f) => !temFerramenta(f.cmd, f.args));
   }
 
@@ -131,7 +210,48 @@ function criarInstalador({ dataDir, appDir }) {
     if (ferramentasFaltando().length) throw new Error('as ferramentas não ficaram disponíveis; reinicie o app');
   }
 
-  async function instalar(aoEtapa) {
+  // Windows: baixa um zip fixado, confere o hash e extrai numa pasta temporária.
+  async function baixarFerramentaWindows(fonte, nome, aoProgresso) {
+    fs.mkdirSync(c.ferramentas, { recursive: true });
+    const zip = path.join(c.ferramentas, `${nome}.zip`);
+    await baixarVerificado(fonte.url, zip, fonte.sha256, aoProgresso);
+    const pasta = path.join(c.ferramentas, `${nome}-extraido`);
+    try {
+      extrairZip(zip, pasta);
+    } finally {
+      fs.rmSync(zip, { force: true });
+    }
+    return pasta;
+  }
+
+  async function instalarWindows(aoEtapa) {
+    if (!fs.existsSync(c.whisperBin)) {
+      const pasta = await baixarFerramentaWindows(fontesWindows.whisper, 'whisper', (p) =>
+        aoEtapa({ etapa: 'whisper', pct: p, texto: 'Baixando o whisper.cpp…' }));
+      try {
+        const dll = acharPasta(pasta, 'whisper-cli.exe');
+        if (!dll) throw new Error('o whisper-cli.exe não veio no pacote');
+        copiarArquivos(dll, path.dirname(c.whisperBin), (n) => n.toLowerCase() === 'whisper-cli.exe' || n.toLowerCase().endsWith('.dll'));
+      } finally {
+        fs.rmSync(pasta, { recursive: true, force: true });
+      }
+    }
+
+    if (!fs.existsSync(c.ffmpegDoProjeto)) {
+      const pasta = await baixarFerramentaWindows(fontesWindows.ffmpeg, 'ffmpeg', (p) =>
+        aoEtapa({ etapa: 'ffmpeg', pct: p, texto: 'Baixando o ffmpeg…' }));
+      try {
+        const bin = acharPasta(pasta, 'ffmpeg.exe');
+        if (!bin) throw new Error('o ffmpeg.exe não veio no pacote');
+        // Só o necessário: o ffmpeg e as DLLs dele (ffplay e ffprobe não são usados).
+        copiarArquivos(bin, path.dirname(c.ffmpegDoProjeto), (n) => n.toLowerCase() === 'ffmpeg.exe' || n.toLowerCase().endsWith('.dll'));
+      } finally {
+        fs.rmSync(pasta, { recursive: true, force: true });
+      }
+    }
+  }
+
+  async function instalarLinux(aoEtapa) {
     await instalarFerramentas(aoEtapa);
 
     if (!fs.existsSync(path.join(c.whisperDir, '.git'))) {
@@ -144,6 +264,11 @@ function criarInstalador({ dataDir, appDir }) {
     await rodar('cmake', ['-S', c.whisperDir, '-B', c.buildDir, '-DCMAKE_BUILD_TYPE=Release'], { aoLinha: (t) => aoEtapa({ texto: t }) });
     await rodar('cmake', ['--build', c.buildDir, '--config', 'Release', '--target', 'whisper-cli', '--parallel', String(os.cpus().length)], { aoLinha: (t) => aoEtapa({ texto: t }) });
     if (!fs.existsSync(c.whisperBin)) throw new Error('o whisper-cli não foi gerado');
+  }
+
+  async function instalar(aoEtapa) {
+    if (windows) await instalarWindows(aoEtapa);
+    else await instalarLinux(aoEtapa);
 
     if (!fs.existsSync(c.modelo)) {
       aoEtapa({ etapa: 'modelo', pct: 0, texto: 'Baixando o modelo de voz (487 MB)…' });
@@ -160,4 +285,4 @@ function criarInstalador({ dataDir, appDir }) {
   return { estado, instalar, ferramentasFaltando };
 }
 
-module.exports = { criarInstalador, caminhos, baixarModelo };
+module.exports = { criarInstalador, caminhos, baixarModelo, baixarVerificado, FONTES_WINDOWS };

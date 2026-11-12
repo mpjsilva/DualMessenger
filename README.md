@@ -25,7 +25,7 @@ O Dual Messenger abre várias contas de WhatsApp Web e Telegram Web numa janela 
 
 Este é um **projeto de estudo de UI/UX**. A interface foi desenhada e refeita para praticar design de interação: abas, faixa de destaques, estados da transcrição, configurações em painel lateral e temas.
 
-Versão atual: **0.1.11** · [Releases](https://github.com/mpjsilva/DualMessenger/releases) · [Desenvolvimento](#para-desenvolvedores)
+Versão atual: **0.1.12** · [Releases](https://github.com/mpjsilva/DualMessenger/releases) · [Desenvolvimento](#para-desenvolvedores)
 
 ## Principais diferenciais
 
@@ -56,22 +56,22 @@ E mais:
 
 ### Pelo AppImage (recomendado)
 
-1. Baixe `DualMessenger-0.1.11.AppImage` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (está no arquivo `.sha256` ao lado).
+1. Baixe `DualMessenger-0.1.12.AppImage` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (está no arquivo `.sha256` ao lado).
 2. Torne o arquivo executável e abra:
 
 ```bash
-chmod +x DualMessenger-0.1.11.AppImage
-./DualMessenger-0.1.11.AppImage
+chmod +x DualMessenger-0.1.12.AppImage
+./DualMessenger-0.1.12.AppImage
 ```
 
-> Em distribuições recentes, o AppImage pede o FUSE 2 (pacote `fuse-libs` no Fedora, `libfuse2` no Debian e no Ubuntu). Sem ele, rode com `./DualMessenger-0.1.11.AppImage --appimage-extract-and-run`.
+> Em distribuições recentes, o AppImage pede o FUSE 2 (pacote `fuse-libs` no Fedora, `libfuse2` no Debian e no Ubuntu). Sem ele, rode com `./DualMessenger-0.1.12.AppImage --appimage-extract-and-run`.
 
 ### Windows 10 e 11
 
-1. Baixe `DualMessenger-Setup-0.1.11.exe` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (arquivo `.sha256` ao lado).
+1. Baixe `DualMessenger-Setup-0.1.12.exe` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (arquivo `.sha256` ao lado).
 2. Execute o instalador. Ele instala para todos os usuários e pede permissão de administrador.
 
-> A versão para Windows ainda não tem a transcrição de mensagens de voz: o botão **Preparar** só funciona no Linux. Os demais recursos (contas, destaques, notificações, userscripts) funcionam.
+> No Windows, o **Preparar** baixa prontos o `whisper-cli.exe` (whisper.cpp v1.8.2) e o `ffmpeg.exe` (FFmpeg 8.1, build LGPL), conferindo o SHA-256 de cada um, e depois o modelo de voz. Não há compilação. A transcrição no Windows ainda não foi testada numa máquina Windows real.
 
 O AppImage não inclui o whisper.cpp, o modelo de voz nem o ffmpeg. O botão **Preparar**, descrito abaixo, instala o que falta (inclusive o ffmpeg), compila o whisper.cpp e baixa o modelo.
 
@@ -119,7 +119,7 @@ npm start
 - O WhatsApp e o Telegram são os sites oficiais, carregados dentro do app. O código não tem telemetria nem servidor do projeto.
 - Cada conta usa uma partição própria do navegador embutido: cookies, cache e armazenamento não se misturam entre contas.
 - A transcrição roda no seu computador. O áudio é gravado numa pasta temporária, usado e apagado no fim.
-- Além do uso normal de WhatsApp e Telegram e dos scripts que você instalar, o único download do app é o do whisper.cpp e do modelo, no **Preparar**.
+- Além do uso normal de WhatsApp e Telegram e dos scripts que você instalar, os downloads do app são os do **Preparar**: o whisper.cpp (no Linux, pelo git; no Windows, o binário pronto), o ffmpeg (só no Windows) e o modelo.
 
 ## Para desenvolvedores
 
@@ -155,7 +155,7 @@ WHISPER_BIN=... MODELO=... AUDIO=... node tests/smoke-transcricao.js   # WAV 16 
 - A transcrição usa módulos internos do WhatsApp Web. Quando o WhatsApp mudar a estrutura, o botão pode parar de funcionar; o ajuste fica em `src/pagina-whatsapp.js`.
 - No Telegram, o Transcrever toca a mensagem por um instante para carregar o áudio (e pausa logo depois). Se o áudio demorar, o app espera até 30 segundos. Os seletores seguem o Telegram Web A e podem mudar com as atualizações dele.
 - Os destaques dependem da lista de conversas de cada site, lida pelos seletores de `src/conversas.js`. Grupos e conversas fora da lista carregada podem não ser encontrados.
-- O instalador do **Preparar** conhece só o `dnf`. Em outras distribuições, a instalação das ferramentas é manual.
+- O instalador do **Preparar** no Linux conhece só o `dnf`. Em outras distribuições, a instalação das ferramentas é manual. No Windows, o whisper.cpp fica na versão 1.8.2, a última com binário pronto.
 - O ícone no GNOME (dock, Alt+Tab, Atividades) não foi testado numa área de trabalho real.
 - O aviso de clique em notificação cobre as notificações criadas pela página. Notificações enviadas por service worker (push em segundo plano) não passam por ele.
 - O tema das contas depende de cada site seguir o modo claro/escuro do sistema. No Electron isso foi verificado; nas contas, o resultado depende do site.
