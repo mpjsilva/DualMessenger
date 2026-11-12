@@ -99,6 +99,7 @@ function snapshot() {
     activeId,
     panelOpen,
     tema: state.tema,
+    versao: app.getVersion(),
     transcricao: instalador ? { ...instalador.estado(), ...instalacao } : null,
     listaFrente,
     services: Object.entries(SERVICES).map(([key, s]) => ({ key, label: s.label })),

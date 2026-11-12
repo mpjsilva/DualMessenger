@@ -427,6 +427,7 @@ function renderTranscricao() {
 
 function render(novo) {
   estado = novo;
+  $('versao-app').textContent = 'Versão ' + estado.versao;
   aplicarTema();
   renderAbas();
   renderMenuNova();
