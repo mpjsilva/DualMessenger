@@ -12,6 +12,7 @@ const {
   dialog,
   shell,
   Menu,
+  nativeTheme,
 } = require('electron');
 const { readJson, writeJsonAtomic } = require('./store');
 const { ScriptManager } = require('./motor');
@@ -36,6 +37,13 @@ const ORIGENS_TRANSCRICAO = ['https://web.whatsapp.com/', 'https://web.telegram.
 const TAB_BAR_HEIGHT = 56; // altura da barra flutuante (ver --barra em ui/styles.css)
 const FAV_BAR_HEIGHT = 44; // linha dos destaques, que só existe quando há algum destaque (ver #faixa-favoritas)
 const TEMAS = ['auto', 'claro', 'escuro'];
+
+// O tema do app vale também para as páginas das contas: o Electron informa o modo ao site
+// (prefers-color-scheme), e o WhatsApp e o Telegram seguem esse modo.
+function aplicarTemaNasContas() {
+  const modo = { auto: 'system', claro: 'light', escuro: 'dark' };
+  nativeTheme.themeSource = modo[state.tema] || 'system';
+}
 
 // Serviços conhecidos. Cada conta nova ganha uma partição própria (cookies,
 // IndexedDB, cache e localStorage separados), então o login de uma não afeta a outra.
@@ -381,6 +389,7 @@ function registerIpc() {
     if (!TEMAS.includes(tema)) throw new Error('tema desconhecido');
     state.tema = tema;
     saveState();
+    aplicarTemaNasContas();
     broadcast();
   });
   handle('account:rename', (id, nome) => {
@@ -555,6 +564,7 @@ app.whenReady().then(async () => {
   state = readJson(statePath(), { accounts: [], openTabs: [], favoritas: [] });
   state.favoritas = state.favoritas || [];
   if (!TEMAS.includes(state.tema)) state.tema = 'auto';
+  aplicarTemaNasContas();
   // Pop-ups temporários da sessão anterior não devem voltar.
   state.accounts = state.accounts.filter((a) => !a.transient);
 
