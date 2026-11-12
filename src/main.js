@@ -89,9 +89,14 @@ function sameDomain(url, domain) {
   }
 }
 
+// Contagem de não lidas no título: "(3) WhatsApp", "1 notificação" (Telegram alterna esse título)
+// ou "Telegram (2)".
 function parseBadge(title) {
-  const m = String(title || '').match(/^\((\d+)\)/);
-  return m ? Number(m[1]) : 0;
+  const t = String(title || '');
+  const inicio = t.match(/^[^\d\s]{0,3}\s*\(?(\d+)\)?\s/);
+  if (inicio) return Number(inicio[1]);
+  const fim = t.match(/\((\d+)\)\s*$/);
+  return fim ? Number(fim[1]) : 0;
 }
 
 function snapshot() {
