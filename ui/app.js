@@ -376,6 +376,7 @@ function renderScripts() {
     const info = el('div');
     info.appendChild(el('div', { className: 'titulo' }, s.name + (s.version ? ' ' + s.version : '')));
     info.appendChild(el('div', { className: 'sub' }, s.enabled ? 'Ativo' : 'Desativado'));
+    if (s.erro) info.appendChild(el('div', { className: 'erro-txt' }, 'Não executado: ' + s.erro));
     item.appendChild(info);
     const controles = el('div', { className: 'controles' });
     const toggle = el('button', { className: 'btn' }, s.enabled ? 'Desativar' : 'Ativar');
@@ -388,6 +389,41 @@ function renderScripts() {
     controles.appendChild(remover);
     item.appendChild(controles);
     lista.appendChild(item);
+  }
+
+  const dominios = $('lista-dominios');
+  dominios.textContent = '';
+  if (!estado.dominios || estado.dominios.length === 0) {
+    dominios.appendChild(el('div', { className: 'nota' }, 'Nenhum domínio cadastrado.'));
+  }
+  for (const d of estado.dominios || []) {
+    const item = el('div', { className: 'item' });
+    item.appendChild(el('div', { className: 'titulo' }, d));
+    const controles = el('div', { className: 'controles' });
+    const remover = el('button', { className: 'btn perigo' }, 'Remover');
+    remover.addEventListener('click', () => chamar(window.dm.removeDomain(d)));
+    controles.appendChild(remover);
+    item.appendChild(controles);
+    dominios.appendChild(item);
+  }
+
+  const comandos = $('lista-comandos');
+  comandos.textContent = '';
+  if (!estado.comandos || estado.comandos.length === 0) {
+    comandos.appendChild(el('div', { className: 'nota' }, 'Nenhum comando de menu na aba da frente.'));
+  }
+  for (const c of estado.comandos || []) {
+    const item = el('div', { className: 'item' });
+    const info = el('div');
+    info.appendChild(el('div', { className: 'titulo' }, c.nome));
+    info.appendChild(el('div', { className: 'sub' }, c.script));
+    item.appendChild(info);
+    const controles = el('div', { className: 'controles' });
+    const executar = el('button', { className: 'btn primario' }, 'Executar');
+    executar.addEventListener('click', () => chamar(window.dm.runCommand(c.id)));
+    controles.appendChild(executar);
+    item.appendChild(controles);
+    comandos.appendChild(item);
   }
 }
 
@@ -559,6 +595,13 @@ function init() {
     b.addEventListener('click', () => chamar(window.dm.abrirLink(b.dataset.link)));
   }
   $('btn-add-script').addEventListener('click', () => chamar(window.dm.importScript()));
+  $('btn-add-dominio').addEventListener('click', async () => {
+    const r = await chamar(window.dm.addDomain($('dominio-novo').value));
+    if (r.ok) $('dominio-novo').value = '';
+  });
+  $('dominio-novo').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') $('btn-add-dominio').click();
+  });
   $('btn-add-fav').addEventListener('click', async () => {
     const nome = $('fav-nome').value;
     const conta = $('fav-conta').value;

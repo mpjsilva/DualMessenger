@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('dm', {
   importScript: () => call('script:import'),
   toggleScript: (id, enabled) => call('script:toggle', id, enabled),
   removeScript: (id) => call('script:remove', id),
+  addDomain: (dominio) => call('dominios:adicionar', dominio),
+  removeDomain: (dominio) => call('dominios:remover', dominio),
+  runCommand: (id) => call('script:comando', id),
   onStateChanged: (fn) => {
     ipcRenderer.on('state:changed', (_e, state) => fn(state));
   },

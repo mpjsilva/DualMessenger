@@ -50,3 +50,34 @@ test('urlMatches aceita @include com glob e regex', () => {
   assert.equal(urlMatches(regex, 'https://a.com/12'), true);
   assert.equal(urlMatches(regex, 'https://a.com/x'), false);
 });
+
+test('parseHeader lê @require, @resource e @connect e normaliza os nomes GM.*', () => {
+  const meta = parseHeader([
+    '// ==UserScript==',
+    '// @name Completo',
+    '// @require https://cdn.jsdelivr.net/npm/lib@1/x.js',
+    '// @require https://cdn.jsdelivr.net/npm/outra.js',
+    '// @resource css https://cdn.jsdelivr.net/npm/estilo.css',
+    '// @connect api.exemplo.com',
+    '// @grant GM.getValue',
+    '// @grant GM.xmlHttpRequest',
+    '// ==/UserScript==',
+  ].join('\n'));
+  assert.deepEqual(meta.require, ['https://cdn.jsdelivr.net/npm/lib@1/x.js', 'https://cdn.jsdelivr.net/npm/outra.js']);
+  assert.deepEqual(meta.resource, ['css https://cdn.jsdelivr.net/npm/estilo.css']);
+  assert.deepEqual(meta.connect, ['api.exemplo.com']);
+  assert.deepEqual(meta.grant, ['GM_getValue', 'GM_xmlhttpRequest']);
+});
+
+test('domínios: normalizarDominio e hostCasa', () => {
+  const { normalizarDominio, hostCasa, hostDe } = require('../src/userscripts');
+  assert.equal(normalizarDominio('https://Exemplo.com/caminho'), 'exemplo.com');
+  assert.equal(normalizarDominio('*.exemplo.com'), 'exemplo.com');
+  assert.equal(normalizarDominio('localhost'), null);
+  assert.equal(normalizarDominio(''), null);
+  assert.equal(hostCasa('a.exemplo.com', 'exemplo.com'), true);
+  assert.equal(hostCasa('exemplo.com', 'exemplo.com'), true);
+  assert.equal(hostCasa('exemplo.com.evil.net', 'exemplo.com'), false);
+  assert.equal(hostCasa('xexemplo.com', 'exemplo.com'), false);
+  assert.equal(hostDe('não é url'), null);
+});

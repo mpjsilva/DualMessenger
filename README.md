@@ -25,7 +25,7 @@ O Dual Messenger abre várias contas de WhatsApp Web e Telegram Web numa janela 
 
 Este é um **projeto de estudo de UI/UX**. A interface foi desenhada e refeita para praticar design de interação: abas, faixa de destaques, estados da transcrição, configurações em painel lateral e temas.
 
-Versão atual: **0.1.8** · [Releases](https://github.com/mpjsilva/DualMessenger/releases) · [Desenvolvimento](#para-desenvolvedores)
+Versão atual: **0.1.9** · [Releases](https://github.com/mpjsilva/DualMessenger/releases) · [Desenvolvimento](#para-desenvolvedores)
 
 ## Principais diferenciais
 
@@ -34,7 +34,7 @@ Versão atual: **0.1.8** · [Releases](https://github.com/mpjsilva/DualMessenger
 | **Contas** | Abas misturadas numa só sessão, ou perfis separados em janelas diferentes | Cada conta tem sessão própria, com nome e serviço visíveis na aba |
 | **Destaques** | Favoritos genéricos | Conversas do WhatsApp e do Telegram numa faixa abaixo das abas. A bolinha mostra o serviço (verde no WhatsApp, azul no Telegram) e acende quando a conta está aberta |
 | **Mensagens de voz** | Só tocar o áudio | Botão **Transcrever**: o texto aparece aos poucos, a cada 15 segundos de áudio, e tudo roda no computador |
-| **Userscripts** | Extensão à parte, uma por navegador | Arquivos `.user.js` importados direto nas contas, com só as funções `GM_*` que cada script declara |
+| **Userscripts** | Extensão à parte, uma por navegador | Arquivos `.user.js` importados direto nas contas, com a API do Tampermonkey (`GM_*`, `GM.*`, `@require`, `@resource`, `@connect`, menus). `@require` e `@resource` só de domínios que você cadastra |
 | **Teclado** | Atalhos fixos do navegador | Ctrl+Tab, Ctrl+1 a Ctrl+9, Ctrl+R e Esc para trocar, recarregar e fechar as Opções |
 | **Abas** | Reordenação por arrastar com prévia ao vivo: as outras abas deslizam para abrir espaço | Ctrl+1 a Ctrl+9 seguem a ordem da barra |
 
@@ -56,15 +56,15 @@ E mais:
 
 ### Pelo AppImage (recomendado)
 
-1. Baixe `DualMessenger-0.1.8.AppImage` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (está no arquivo `.sha256` ao lado).
+1. Baixe `DualMessenger-0.1.9.AppImage` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (está no arquivo `.sha256` ao lado).
 2. Torne o arquivo executável e abra:
 
 ```bash
-chmod +x DualMessenger-0.1.8.AppImage
-./DualMessenger-0.1.8.AppImage
+chmod +x DualMessenger-0.1.9.AppImage
+./DualMessenger-0.1.9.AppImage
 ```
 
-> Em distribuições recentes, o AppImage pede o FUSE 2 (pacote `fuse-libs` no Fedora, `libfuse2` no Debian e no Ubuntu). Sem ele, rode com `./DualMessenger-0.1.8.AppImage --appimage-extract-and-run`.
+> Em distribuições recentes, o AppImage pede o FUSE 2 (pacote `fuse-libs` no Fedora, `libfuse2` no Debian e no Ubuntu). Sem ele, rode com `./DualMessenger-0.1.9.AppImage --appimage-extract-and-run`.
 
 O AppImage não inclui o whisper.cpp, o modelo de voz nem o ffmpeg. O botão **Preparar**, descrito abaixo, instala o que falta (inclusive o ffmpeg), compila o whisper.cpp e baixa o modelo.
 
@@ -153,6 +153,11 @@ WHISPER_BIN=... MODELO=... AUDIO=... node tests/smoke-transcricao.js   # WAV 16 
 - O aviso de clique em notificação cobre as notificações criadas pela página. Notificações enviadas por service worker (push em segundo plano) não passam por ele.
 - O tema das contas depende de cada site seguir o modo claro/escuro do sistema. No Electron isso foi verificado; nas contas, o resultado depende do site.
 - A arrastar com prévia e a animação foram testados por lógica e build; o gesto na janela ainda deve ser conferido em cada versão.
+- Userscripts: o script é injetado quando a página termina de carregar (`dom-ready`); o `@run-at` é ignorado: todos os scripts rodam quando a página termina de carregar.
+- `GM_addValueChangeListener` avisa só alterações feitas na própria página; as outras páginas não recebem o aviso.
+- `@connect` é conferido quando o script declara algum; sem ele, `GM_xmlhttpRequest` aceita qualquer http(s). `@connect self` não é reconhecido.
+- Os `@require` e `@resource` ficam em cache em `userscripts/cache` e não são baixados de novo sozinhos; apague o arquivo da pasta para forçar a atualização.
+- Os comandos de menu aparecem só para a aba da frente, e `GM_openInTab` abre no navegador do sistema, não em uma aba do app.
 
 ## Agradecimentos
 
@@ -168,7 +173,7 @@ O Dual Messenger só existe porque outros projetos livres fazem o trabalho pesad
 - **[FFmpeg](https://ffmpeg.org)** (LGPL ou GPL, conforme a build): converte os áudios para a transcrição.
 
 **Userscripts**
-- Os scripts usam o cabeçalho `==UserScript==` do [Tampermonkey](https://www.tampermonkey.net), extensão que popularizou o formato.
+- Os scripts usam o cabeçalho `==UserScript==` e a API do [Tampermonkey](https://www.tampermonkey.net), extensão que popularizou o formato.
 
 **Aviso:** WhatsApp e Telegram são marcas dos seus donos. Este projeto não é afiliado a nenhum dos dois.
 

@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('__dmGM', {
   setValue: (t, k, v) => sincrono('gm:setValue', t, k, v),
   deleteValue: (t, k) => sincrono('gm:deleteValue', t, k),
   listValues: (t) => sincrono('gm:listValues', t),
+  menu: (t, nome) => sincrono('gm:menu', t, nome),
+  menuRemover: (t, id) => sincrono('gm:menuRemover', t, id),
   xhr: (t, opts) => ipcRenderer.invoke('gm:xhr', t, opts),
   notification: (t, opts) => ipcRenderer.invoke('gm:notification', t, opts),
+  abrir: (t, url) => ipcRenderer.invoke('gm:abrir', t, url),
+  copiar: (t, texto) => ipcRenderer.invoke('gm:copiar', t, texto),
 });

@@ -112,6 +112,10 @@ function snapshot() {
     listaFrente,
     services: Object.entries(SERVICES).map(([key, s]) => ({ key, label: s.label })),
     scripts: scripts ? scripts.list() : [],
+    dominios: scripts ? scripts.listarDominios() : [],
+    comandos: scripts && activeId && tabs.has(activeId)
+      ? scripts.comandosDaAba(tabs.get(activeId).view.webContents.id)
+      : [],
     favoritas: state.favoritas.map((f) => {
       const acc = accountById(f.accountId);
       return { id: f.id, nome: f.nome, accountId: f.accountId, accountName: acc ? acc.name : '?', service: acc ? acc.service : null, open: state.openTabs.includes(f.accountId) };
@@ -343,7 +347,7 @@ function esperarCarregamento(wc, limite = 30000) {
 }
 
 function registerIpc() {
-  registerGmIpc(scripts);
+  registerGmIpc(scripts, { aoMudar: () => broadcast() });
   const handle = (channel, fn) => ipcMain.handle(channel, async (_e, ...args) => {
     try {
       return { ok: true, value: await fn(...args) };
@@ -503,6 +507,20 @@ function registerIpc() {
     scripts.remove(id);
     broadcast();
   });
+  handle('dominios:adicionar', (dominio) => {
+    const d = scripts.adicionarDominio(dominio);
+    broadcast();
+    return d;
+  });
+  handle('dominios:remover', (dominio) => {
+    scripts.removerDominio(dominio);
+    broadcast();
+  });
+  handle('script:comando', async (id) => {
+    const entry = activeId && tabs.get(activeId);
+    if (!entry) throw new Error('nenhuma aba aberta');
+    await scripts.executarComando(entry.view.webContents, id);
+  });
 }
 
 // Menu de aplicativos e barra de tarefas (Linux): o ícone e o atalho ficam no perfil do usuário.
@@ -558,7 +576,7 @@ if (process.platform === 'linux') app.setDesktopName(`${ID_APP}.desktop`);
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null); // sem a barra padrão do Electron (File, Edit, View…)
   integrarAoSistema(); // antes da janela: o GNOME precisa do atalho quando ela aparece
-  scripts = new ScriptManager({ dataDir: app.getPath('userData') });
+  scripts = new ScriptManager({ dataDir: app.getPath('userData'), appVersion: app.getVersion() });
   transcricao = criarServicoTranscricao({ dataDir: app.getPath('userData'), appDir: path.join(__dirname, '..') });
   instalador = criarInstalador({ dataDir: app.getPath('userData'), appDir: path.join(__dirname, '..') });
   state = readJson(statePath(), { accounts: [], openTabs: [], favoritas: [] });

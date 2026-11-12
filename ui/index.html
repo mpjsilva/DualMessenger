@@ -138,6 +138,16 @@
           </div>
           <div id="lista-scripts"></div>
         </div>
+        <h2 class="titulo-pagina">Domínios permitidos</h2>
+        <p class="legenda">Um <code>@require</code> ou <code>@resource</code> só é baixado de um domínio cadastrado aqui (e dos subdomínios dele). Ex.: <code>cdn.jsdelivr.net</code>.</p>
+        <div class="grupo form-fav">
+          <input id="dominio-novo" type="text" maxlength="120" placeholder="Ex.: cdn.jsdelivr.net" aria-label="Domínio">
+          <button id="btn-add-dominio" class="btn primario">Adicionar</button>
+        </div>
+        <div id="lista-dominios" class="grupo"></div>
+        <h2 class="titulo-pagina">Comandos de menu</h2>
+        <p class="legenda">Comandos criados por <code>GM_registerMenuCommand</code> na aba da frente. Clique para executar.</p>
+        <div id="lista-comandos" class="grupo"></div>
       </div>
 
       <div class="pagina oculta" data-pagina="transcricao">
