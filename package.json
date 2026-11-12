@@ -1,0 +1,40 @@
+{
+  "name": "dual-messenger-app",
+  "productName": "Dual Messenger",
+  "version": "0.1.0",
+  "description": "Vários WhatsApp Web e Telegram Web em abas isoladas, com transcrição local de mensagens de voz e userscripts.",
+  "main": "src/main.js",
+  "author": "mpjsilva",
+  "homepage": "https://github.com/mpjsilva/DualMessenger",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mpjsilva/DualMessenger.git"
+  },
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.js",
+    "dist": "electron-builder --linux AppImage"
+  },
+  "build": {
+    "appId": "local.dualmessenger.app",
+    "artifactName": "DualMessenger-${version}.${ext}",
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Network;InstantMessaging",
+      "icon": "assets/icone.png"
+    },
+    "files": [
+      "src/**/*",
+      "ui/**/*",
+      "assets/**/*",
+      "package.json"
+    ]
+  },
+  "devDependencies": {
+    "electron": "45.3.0",
+    "electron-builder": "26.18.1"
+  }
+}

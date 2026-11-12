@@ -1,0 +1,432 @@
+'use strict';
+
+// Interface da barra de abas e das Opções. Todo texto vindo do app entra com textContent (nunca innerHTML).
+
+let estado = null;
+let editandoConta = null; // conta com o nome em edição: a lista não é redesenhada enquanto isso
+let chaveListaFrente = null; // evita refazer o menu de conversas (e perder a escolha) a cada atualização
+
+const $ = (id) => document.getElementById(id);
+
+function el(tag, attrs = {}, texto = null) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'className') node.className = v;
+    else node.setAttribute(k, v);
+  }
+  if (texto !== null) node.textContent = texto;
+  return node;
+}
+
+function mostrarErro(msg) {
+  const box = $('erro');
+  box.textContent = msg;
+  box.classList.remove('hidden');
+  clearTimeout(mostrarErro._t);
+  mostrarErro._t = setTimeout(() => box.classList.add('hidden'), 5000);
+}
+
+async function chamar(promessa) {
+  const r = await promessa;
+  if (!r.ok) mostrarErro(r.error);
+  return r;
+}
+
+function aplicarTema() {
+  document.documentElement.dataset.tema = estado.tema || 'auto';
+  for (const b of document.querySelectorAll('#tema-opcoes button')) {
+    const ativo = b.dataset.tema === (estado.tema || 'auto');
+    b.classList.toggle('ativo', ativo);
+    b.setAttribute('aria-pressed', String(ativo));
+  }
+}
+
+// Ícones desenhados no mesmo traço dos botões (SVG fixo do próprio app, sem HTML vindo de fora).
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const CAMINHOS = {
+  aviao: 'M21 4L3 11l6 2 2 6 3-4 5 4z',
+  fechar: 'M6 6l12 12M18 6L6 18',
+};
+function icone(nome, classe = 'icone') {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', classe);
+  svg.setAttribute('aria-hidden', 'true');
+  const caminho = document.createElementNS(SVG_NS, 'path');
+  caminho.setAttribute('d', CAMINHOS[nome]);
+  svg.appendChild(caminho);
+  return svg;
+}
+
+// Glifo oficial do WhatsApp (pasta Brand Resource Center, Digital Glyph White RGB 2026, SVG 720×720).
+// Não é desenhado à mão: a diretriz de marca pede o logotipo oficial, sem versões de outras fontes.
+const GLIFO_WHATSAPP = {
+  viewBox: '0 0 720 720',
+  caminhos: [
+    'M360,0C161.18,0,0,161.18,0,360c0,65.41,17.45,126.75,47.94,179.61L0,720l187.02-44.21c51.34,28.18,110.28,44.21,172.98,44.21,198.82,0,360-161.18,360-360S558.82,0,360,0ZM360,655.52c-60.17,0-116.13-17.98-162.82-48.87l-110.49,28.14,30.99-105.61c-33.53-47.93-53.2-106.26-53.2-169.19,0-163.21,132.31-295.52,295.52-295.52s295.52,132.31,295.52,295.52-132.31,295.52-295.52,295.52Z',
+    'M444.35,407.52l87.1,41.06c4,1.88,6.56,5.94,6.2,10.34-.94,11.46-5.54,34.43-26.13,55.02-58.12,58.12-162.49-7.64-166.74-10.18-25.67-13.79-50.06-32.24-73.19-55.36s-41.58-47.52-55.37-73.19c-2.55-4.24-68.31-108.61-10.18-166.74,20.59-20.59,43.56-25.19,55.02-26.13,4.41-.36,8.46,2.2,10.34,6.2l41.07,87.1c1.94,4.12,1.09,9.02-2.13,12.24l-30.61,30.61c-6.62,6.62-8.56,16.93-4,25.11,11.17,20.03,26.19,39.32,43.59,57.07,17.75,17.4,37.04,32.43,57.07,43.59,8.18,4.56,18.48,2.62,25.11-4l30.61-30.61c3.22-3.22,8.12-4.08,12.24-2.13Z',
+  ],
+};
+function iconeMarca(marca) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', marca.viewBox);
+  svg.setAttribute('class', 'icone marca');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of marca.caminhos) {
+    const caminho = document.createElementNS(SVG_NS, 'path');
+    caminho.setAttribute('d', d);
+    svg.appendChild(caminho);
+  }
+  return svg;
+}
+
+// Mostra uma seção das Opções e marca o item da lateral.
+function mostrarPagina(nome) {
+  for (const b of document.querySelectorAll('.item-menu')) b.classList.toggle('ativo', b.dataset.pagina === nome);
+  for (const p of document.querySelectorAll('.pagina')) p.classList.toggle('oculta', p.dataset.pagina !== nome);
+  document.querySelector('.painel-conteudo').scrollTop = 0;
+}
+
+// Ícone do serviço (glifo do WhatsApp sobre verde, avião sobre azul para Telegram), usado nas abas e no cartão.
+function avatarDoServico(servico) {
+  const chave = servico === 'telegram' ? 'telegram' : 'whatsapp';
+  const avatar = el('span', { className: 'avatar ' + chave });
+  avatar.appendChild(chave === 'telegram' ? icone('aviao') : iconeMarca(GLIFO_WHATSAPP));
+  return avatar;
+}
+
+function renderAbas() {
+  const barra = $('abas');
+  barra.textContent = '';
+  estado.openTabs.forEach((t, i) => {
+    // Até 9 abas: Ctrl+1 … Ctrl+9 (Ctrl+Tab percorre todas).
+    const dica = i < 9 ? ` · Ctrl+${i + 1}` : '';
+    const aba = el('div', { className: 'aba' + (t.id === estado.activeId ? ' ativa' : ''), title: (t.title || t.name) + dica });
+    aba.addEventListener('click', () => chamar(window.dm.selectTab(t.id)));
+    aba.appendChild(avatarDoServico(t.service));
+    aba.appendChild(el('span', { className: 'nome' }, t.name));
+    if (t.badge > 0) aba.appendChild(el('span', { className: 'badge' }, String(t.badge)));
+    const x = el('button', { className: 'fechar', title: 'Fechar aba (a conta continua salva)', 'aria-label': 'Fechar aba' });
+    x.appendChild(icone('fechar'));
+    x.addEventListener('click', (e) => {
+      e.stopPropagation();
+      chamar(window.dm.closeTab(t.id));
+    });
+    aba.appendChild(x);
+    barra.appendChild(aba);
+  });
+  $('vazio').classList.toggle('hidden', estado.openTabs.length > 0);
+}
+
+// Abre ou fecha o menu e avisa o processo principal para expandir a barra.
+function definirMenu(aberto) {
+  $('menu-nova').classList.toggle('hidden', !aberto);
+  document.documentElement.classList.toggle('menu-aberto', aberto);
+  window.dm.setMenu(aberto);
+}
+
+function renderMenuNova() {
+  const menu = $('menu-nova');
+  menu.textContent = '';
+  for (const s of estado.services) {
+    const b = el('button', {});
+    b.appendChild(avatarDoServico(s.key));
+    b.appendChild(el('span', { className: 'nome-menu' }, s.label));
+    b.addEventListener('click', () => {
+      definirMenu(false);
+      chamar(window.dm.newAccount(s.key));
+    });
+    menu.appendChild(b);
+  }
+  const fechadas = estado.accounts.filter((a) => !a.open);
+  if (fechadas.length) {
+    menu.appendChild(el('div', { className: 'rotulo' }, 'Contas salvas'));
+    for (const a of fechadas) {
+      const b = el('button', {});
+      b.appendChild(avatarDoServico(a.service));
+      b.appendChild(el('span', { className: 'nome-menu' }, a.name));
+      b.addEventListener('click', () => {
+        definirMenu(false);
+        chamar(window.dm.openAccount(a.id));
+      });
+      menu.appendChild(b);
+    }
+  }
+}
+
+function renderFavoritas() {
+  const barra = $('favoritas');
+  barra.textContent = '';
+  for (const f of estado.favoritas) {
+    // A bolinha mostra o serviço (verde WhatsApp, azul Telegram); a conta aberta aparece com brilho.
+    const servico = f.service === 'telegram' ? 'telegram' : 'whatsapp';
+    const chip = el('button', { className: 'fav-chip ' + servico + (f.open ? ' aberta' : ''), title: f.accountName }, '★ ' + f.nome);
+    chip.addEventListener('click', () => chamar(window.dm.openFavorite(f.id)));
+    barra.appendChild(chip);
+  }
+  // A linha só existe com algum destaque (o main.js reserva a altura pelo mesmo critério).
+  $('faixa-favoritas').classList.toggle('hidden', !estado.favoritas.length);
+  requestAnimationFrame(atualizarSetasFavoritas);
+  const select = $('fav-conta');
+  const atual = select.value;
+  select.textContent = '';
+  for (const a of estado.accounts) {
+    select.appendChild(el('option', { value: a.id }, a.name));
+  }
+  if (atual) select.value = atual;
+  const lista = $('lista-fav');
+  lista.textContent = '';
+  if (!estado.favoritas.length) lista.appendChild(el('p', { className: 'nota' }, 'Nenhum destaque ainda.'));
+  for (const f of estado.favoritas) {
+    const item = el('div', { className: 'item' });
+    const info = el('div');
+    info.appendChild(el('div', { className: 'titulo' }, f.nome));
+    info.appendChild(el('div', { className: 'sub' }, f.accountName));
+    item.appendChild(info);
+    const controles = el('div', { className: 'controles' });
+    const abrir = el('button', { className: 'btn primario' }, 'Abrir');
+    abrir.addEventListener('click', () => chamar(window.dm.openFavorite(f.id)));
+    const remover = el('button', { className: 'btn perigo' }, 'Remover');
+    remover.addEventListener('click', () => chamar(window.dm.removeFavorite(f.id)));
+    controles.appendChild(abrir);
+    controles.appendChild(remover);
+    item.appendChild(controles);
+    lista.appendChild(item);
+  }
+}
+
+// Setas da linha de destaques, pela posição da rolagem:
+// sem nada escondido, nenhuma; no início, só a da direita; no meio, as duas; no fim, só a da esquerda.
+function atualizarSetasFavoritas() {
+  const trilho = $('favoritas');
+  const folga = trilho.scrollWidth - trilho.clientWidth; // quanto ainda dá para rolar
+  const haMais = folga > 2;
+  const mostraEsq = haMais && trilho.scrollLeft > 2;
+  const mostraDir = haMais && trilho.scrollLeft < folga - 2;
+  $('fav-esq').classList.toggle('hidden', !mostraEsq);
+  $('fav-dir').classList.toggle('hidden', !mostraDir);
+  trilho.classList.toggle('fade-esq', mostraEsq);
+  trilho.classList.toggle('fade-dir', mostraDir);
+}
+
+function rolarFavoritas(direcao) {
+  const trilho = $('favoritas');
+  trilho.scrollBy({ left: direcao * trilho.clientWidth * 0.7, behavior: 'smooth' });
+}
+
+function iniciarFaixaFavoritas() {
+  const trilho = $('favoritas');
+  trilho.addEventListener('scroll', atualizarSetasFavoritas);
+  new ResizeObserver(atualizarSetasFavoritas).observe(trilho);
+  // Roda do mouse (vertical) também rola a linha na horizontal.
+  trilho.addEventListener('wheel', (e) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      trilho.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  }, { passive: false });
+  $('fav-esq').addEventListener('click', () => rolarFavoritas(-1));
+  $('fav-dir').addEventListener('click', () => rolarFavoritas(1));
+}
+
+// Menu de conversas da conta que estava na frente quando Opções foi aberta.
+function renderListaFrente() {
+  const sel = $('fav-lista');
+  const lf = estado.listaFrente;
+  const chave = lf ? `${lf.accountId}|${lf.nomes.join('\n')}` : 'nenhuma';
+  if (chave === chaveListaFrente) return;
+  chaveListaFrente = chave;
+  sel.textContent = '';
+  if (!lf) {
+    sel.appendChild(el('option', { value: '' }, 'Abra a conta'));
+    return;
+  }
+  sel.appendChild(el('option', { value: '' }, `Escolha uma conversa (${lf.nomes.length})`));
+  for (const nome of lf.nomes) sel.appendChild(el('option', { value: nome }, nome));
+  $('fav-conta').value = lf.accountId;
+}
+
+function renderScripts() {
+  const lista = $('lista-scripts');
+  const n = estado.scripts.length;
+  $('scripts-resumo').textContent = n
+    ? `${n} ${n === 1 ? 'userscript importado' : 'userscripts importados'}`
+    : 'Nenhum userscript importado.';
+  lista.textContent = '';
+  for (const s of estado.scripts) {
+    const item = el('div', { className: 'item' });
+    const info = el('div');
+    info.appendChild(el('div', { className: 'titulo' }, s.name + (s.version ? ' ' + s.version : '')));
+    info.appendChild(el('div', { className: 'sub' }, s.enabled ? 'Ativo' : 'Desativado'));
+    item.appendChild(info);
+    const controles = el('div', { className: 'controles' });
+    const toggle = el('button', { className: 'btn' }, s.enabled ? 'Desativar' : 'Ativar');
+    toggle.addEventListener('click', () => chamar(window.dm.toggleScript(s.id, !s.enabled)));
+    const remover = el('button', { className: 'btn perigo' }, 'Remover');
+    remover.addEventListener('click', () => {
+      if (confirm('Remover o script "' + s.name + '"?')) chamar(window.dm.removeScript(s.id));
+    });
+    controles.appendChild(toggle);
+    controles.appendChild(remover);
+    item.appendChild(controles);
+    lista.appendChild(item);
+  }
+}
+
+// Troca o nome da conta por um campo de texto no próprio lugar. Enter salva, Esc cancela.
+function iniciarRenomear(conta, titulo) {
+  editandoConta = conta.id;
+  const input = el('input', { className: 'editar-nome', type: 'text', maxlength: '40', 'aria-label': 'Nome da conta' });
+  input.value = conta.name;
+  let feito = false;
+  const concluir = (salvar) => {
+    if (feito) return;
+    feito = true;
+    const novo = input.value.trim();
+    editandoConta = null;
+    renderContas();
+    if (salvar && novo && novo !== conta.name) chamar(window.dm.renameAccount(conta.id, novo));
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') concluir(true);
+    if (e.key === 'Escape') concluir(false);
+  });
+  input.addEventListener('blur', () => concluir(true));
+  titulo.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+function renderContas() {
+  if (editandoConta) return;
+  const lista = $('lista-contas');
+  lista.textContent = '';
+  if (!estado.accounts.length) {
+    lista.appendChild(el('p', { className: 'nota' }, 'Nenhuma conta criada.'));
+  }
+  for (const a of estado.accounts) {
+    const item = el('div', { className: 'item' });
+    const info = el('div');
+    const titulo = el('div', { className: 'titulo' }, a.name);
+    info.appendChild(titulo);
+    info.appendChild(el('div', { className: 'sub' }, a.open ? 'Aberta' : 'Fechada (dados mantidos)'));
+    item.appendChild(info);
+    const controles = el('div', { className: 'controles' });
+    const renomear = el('button', { className: 'btn' }, 'Renomear');
+    renomear.addEventListener('click', () => iniciarRenomear(a, titulo));
+    controles.appendChild(renomear);
+    if (!a.open) {
+      const abrir = el('button', { className: 'btn primario' }, 'Abrir');
+      abrir.addEventListener('click', () => chamar(window.dm.openAccount(a.id)));
+      controles.appendChild(abrir);
+    }
+    const excluir = el('button', { className: 'btn perigo' }, 'Excluir dados');
+    excluir.addEventListener('click', () => {
+      if (confirm(`Excluir "${a.name}"? Login e dados locais dessa conta serão apagados. Não tem volta.`)) {
+        chamar(window.dm.deleteAccount(a.id));
+      }
+    });
+    controles.appendChild(excluir);
+    item.appendChild(controles);
+    lista.appendChild(item);
+  }
+}
+
+// Opções › Transcrição: mostra o estado e o progresso da preparação (vem do processo principal).
+function renderTranscricao() {
+  const t = estado.transcricao;
+  if (!t) return;
+  const titulo = $('tr-titulo');
+  const sub = $('tr-sub');
+  const btn = $('btn-tr');
+  const barraCheia = $('tr-barra');
+  if (t.rodando) {
+    titulo.textContent = 'Preparando…';
+    sub.textContent = t.texto || '';
+  } else if (t.erro) {
+    titulo.textContent = 'Não foi possível preparar';
+    sub.textContent = t.erro;
+  } else if (t.pronto) {
+    titulo.textContent = 'Pronta para usar';
+    sub.textContent = 'Toque em Transcrever numa mensagem de voz do WhatsApp.';
+  } else {
+    titulo.textContent = 'Não preparada';
+    sub.textContent = 'Baixa o modelo de voz (487 MB) e prepara o programa de transcrição. Leva alguns minutos.';
+  }
+  btn.disabled = !!t.rodando;
+  btn.textContent = t.pronto && !t.rodando ? 'Preparar de novo' : 'Preparar';
+  $('tr-progresso').classList.toggle('hidden', !t.rodando);
+  barraCheia.style.width = t.pct == null ? '' : `${Math.round(t.pct * 100)}%`;
+  barraCheia.classList.toggle('indeterminada', t.pct == null);
+}
+
+function render(novo) {
+  estado = novo;
+  aplicarTema();
+  renderAbas();
+  renderMenuNova();
+  renderFavoritas(); // os chips ficam na barra, então renderizam sempre
+  $('painel').classList.toggle('hidden', !estado.panelOpen);
+  // Com a barra compacta (painel fechado) o aviso de erro fica dentro dela, onde dá para ver.
+  document.documentElement.classList.toggle('compacto', !estado.panelOpen);
+  if (estado.panelOpen) {
+    renderListaFrente(); // depois de renderFavoritas: ela repõe a lista de contas
+    renderScripts();
+    renderContas();
+    renderTranscricao();
+  }
+}
+
+function init() {
+  $('btn-nova').addEventListener('click', (e) => {
+    e.stopPropagation();
+    definirMenu($('menu-nova').classList.contains('hidden'));
+  });
+  document.addEventListener('click', () => {
+    if (!$('menu-nova').classList.contains('hidden')) definirMenu(false);
+  });
+
+  iniciarFaixaFavoritas();
+  $('btn-opcoes').addEventListener('click', () => chamar(window.dm.setPanel(true)));
+  // ★ da barra: abre Opções já na página Destaques. A página muda antes, para não esperar a lista da conta.
+  $('btn-destaques').addEventListener('click', () => {
+    mostrarPagina('destaques');
+    chamar(window.dm.setPanel(true));
+  });
+  $('btn-fechar-painel').addEventListener('click', () => chamar(window.dm.setPanel(false)));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && estado && estado.panelOpen && !editandoConta) chamar(window.dm.setPanel(false));
+  });
+  for (const b of document.querySelectorAll('.item-menu')) {
+    b.addEventListener('click', () => mostrarPagina(b.dataset.pagina));
+  }
+  for (const b of document.querySelectorAll('[data-link]')) {
+    b.addEventListener('click', () => chamar(window.dm.abrirLink(b.dataset.link)));
+  }
+  $('btn-add-script').addEventListener('click', () => chamar(window.dm.importScript()));
+  $('btn-add-fav').addEventListener('click', async () => {
+    const nome = $('fav-nome').value;
+    const conta = $('fav-conta').value;
+    const r = await chamar(window.dm.addFavorite(conta, nome));
+    if (r.ok) {
+      $('fav-nome').value = '';
+      $('fav-lista').value = '';
+    }
+  });
+  $('fav-lista').addEventListener('change', (e) => {
+    if (e.target.value) $('fav-nome').value = e.target.value;
+  });
+  for (const b of document.querySelectorAll('#tema-opcoes button')) {
+    b.addEventListener('click', () => chamar(window.dm.setTheme(b.dataset.tema)));
+  }
+
+  $('btn-tr').addEventListener('click', () => chamar(window.dm.prepararTranscricao()));
+
+  window.dm.onStateChanged(render);
+  window.dm.getState().then((r) => {
+    if (r.ok) render(r.value);
+    else mostrarErro(r.error);
+  });
+}
+
+init();
