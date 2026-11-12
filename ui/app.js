@@ -32,8 +32,19 @@ async function chamar(promessa) {
   return r;
 }
 
+// Tema efetivo agora: no modo automático segue o sistema.
+function temaEscuroAgora() {
+  const tema = estado.tema || 'auto';
+  return tema === 'escuro' || (tema !== 'claro' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
 function aplicarTema() {
   document.documentElement.dataset.tema = estado.tema || 'auto';
+  // O botão mostra a ação: lua no tema claro (vai escurecer), sol no escuro (vai clarear).
+  const escuro = temaEscuroAgora();
+  $('icone-tema').setAttribute('d', escuro ? CAMINHOS.sol : CAMINHOS.lua);
+  $('btn-tema').title = escuro ? 'Mudar para tema claro' : 'Mudar para tema escuro';
+  $('btn-tema').setAttribute('aria-label', $('btn-tema').title);
   for (const b of document.querySelectorAll('#tema-opcoes button')) {
     const ativo = b.dataset.tema === (estado.tema || 'auto');
     b.classList.toggle('ativo', ativo);
@@ -46,6 +57,9 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const CAMINHOS = {
   aviao: 'M21 4L3 11l6 2 2 6 3-4 5 4z',
   fechar: 'M6 6l12 12M18 6L6 18',
+  // Lua (tema claro, ação: escurecer) e sol (tema escuro, ação: clarear).
+  lua: 'M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z',
+  sol: 'M12 7.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9zM12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
 };
 function icone(nome, classe = 'icone') {
   const svg = document.createElementNS(SVG_NS, 'svg');
@@ -522,6 +536,13 @@ function init() {
 
   iniciarFaixaFavoritas();
   $('btn-opcoes').addEventListener('click', () => chamar(window.dm.setPanel(true)));
+  $('btn-tema').addEventListener('click', () => chamar(window.dm.setTheme(temaEscuroAgora() ? 'claro' : 'escuro')));
+  // Com o tema automático, o ícone acompanha a troca do sistema.
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => aplicarTema());
+  $('btn-scripts').addEventListener('click', () => {
+    mostrarPagina('scripts');
+    chamar(window.dm.setPanel(true));
+  });
   // ★ da barra: abre Opções já na página Destaques. A página muda antes, para não esperar a lista da conta.
   $('btn-destaques').addEventListener('click', () => {
     mostrarPagina('destaques');
