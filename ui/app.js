@@ -96,41 +96,54 @@ function avatarDoServico(servico) {
 }
 
 const EASE_MOVIMENTO = 'cubic-bezier(.2,.8,.2,1)';
-let arrastandoAba = null; // id da aba que está sendo arrastada
-let arrastandoFav = null; // id do destaque que está sendo arrastado
+const TIPO_DESTAQUE = 'application/x-dm-destaque';
+// Arrasto em andamento: { seletor, id, ids, lefts, centros, k, soltou }.
+// As posições são medidas no início do arrasto (sem transform), então a prévia não oscila.
+let arrasto = null;
 
-// Como no navegador: a aba arrastada ocupa o lugar da aba onde foi solta.
-// Vindo da esquerda, a marca fica depois do alvo; vindo da direita, antes.
-function ladoDoAlvo(lista, idOrigem, i) {
-  const de = lista.findIndex((x) => x.id === idOrigem);
-  return de >= 0 && de < i ? 'alvo-depois' : 'alvo-antes';
-}
-function destinoAoSoltar(lista, idOrigem, i) {
-  const de = lista.findIndex((x) => x.id === idOrigem);
-  return de >= 0 && de < i ? i + 1 : i;
+function iniciarArrasto(seletor, id) {
+  const elems = [...document.querySelectorAll(seletor + ' > *')].filter((c) => c.dataset.id);
+  const rects = elems.map((c) => c.getBoundingClientRect());
+  arrasto = {
+    seletor, id,
+    ids: elems.map((c) => c.dataset.id),
+    lefts: rects.map((r) => r.left),
+    centros: rects.map((r) => r.left + r.width / 2),
+    k: null,
+    soltou: false,
+  };
 }
 
-// Prévia ao vivo: enquanto arrasta, os outros itens deslizam para abrir espaço e o arrastado vai
-// até o lugar onde ficará. A lista do DOM não muda até soltar (aí a barra é redesenhada).
-function preverReordenacao(seletorBarra, lista, idOrigem, i) {
-  const barra = document.querySelector(seletorBarra);
-  const elems = [...barra.children].filter((c) => c.dataset.id);
-  const ids = elems.map((c) => c.dataset.id);
-  const de = ids.indexOf(idOrigem);
-  if (de < 0) return;
-  const d = destinoAoSoltar(lista, idOrigem, i);
-  const nova = ids.slice();
-  nova.splice(de, 1);
-  nova.splice(de < d ? d - 1 : d, 0, idOrigem);
-  const posicoes = elems.map((c) => c.offsetLeft);
-  for (const c of elems) {
-    const dx = posicoes[nova.indexOf(c.dataset.id)] - posicoes[ids.indexOf(c.dataset.id)];
+// Posição do arrastado entre os outros: conta quantos centros de vizinhos ficaram antes do ponteiro.
+function atualizarPrevia(clientX) {
+  const { ids, lefts, centros, id } = arrasto;
+  const de = ids.indexOf(id);
+  let k = 0;
+  ids.forEach((_x, j) => { if (j !== de && centros[j] < clientX) k++; });
+  if (k === arrasto.k) return;
+  arrasto.k = k;
+  const nova = ids.filter((x) => x !== id);
+  nova.splice(k, 0, id);
+  for (const c of document.querySelectorAll(arrasto.seletor + ' > *')) {
+    const j = ids.indexOf(c.dataset.id);
+    if (j < 0) continue;
+    const dx = lefts[nova.indexOf(c.dataset.id)] - lefts[j];
     c.style.transform = dx ? `translateX(${dx}px)` : '';
   }
 }
 
-function limparPrevia(seletorBarra) {
-  for (const c of document.querySelectorAll(seletorBarra + ' > *')) c.style.transform = '';
+// Índice de inserção para moverAba (src/abas.js), que espera a lista original com o item dentro.
+function destinoDaPrevia() {
+  const de = arrasto.ids.indexOf(arrasto.id);
+  return arrasto.k > de ? arrasto.k + 1 : arrasto.k;
+}
+
+// Ao soltar, a barra é redesenhada pelo estado novo: as posições da prévia são mantidas até lá.
+function encerrarArrasto() {
+  if (arrasto && !arrasto.soltou) {
+    for (const c of document.querySelectorAll(arrasto.seletor + ' > *')) c.style.transform = '';
+  }
+  arrasto = null;
 }
 
 // Posição horizontal de cada item (pelo id), antes de a barra ser redesenhada.
@@ -156,13 +169,6 @@ function animarReordenacao(barra, antes) {
 }
 
 // Tira as marcas de arrastar. Com `tudo` falso, mantém o arrastar em andamento na aba (só limpa as marcas de alvo).
-function limparAlvos(seletor, tudo = true) {
-  for (const a of document.querySelectorAll(seletor)) {
-    a.classList.remove('alvo-antes', 'alvo-depois');
-    if (tudo) a.classList.remove('arrastando');
-  }
-}
-const limparAlvosAbas = (tudo = true) => limparAlvos('#abas .aba', tudo);
 
 function renderAbas() {
   const barra = $('abas');
@@ -174,31 +180,15 @@ function renderAbas() {
     const aba = el('div', { className: 'aba' + (t.id === estado.activeId ? ' ativa' : ''), title: (t.title || t.name) + dica });
     aba.dataset.id = t.id;
     aba.addEventListener('click', () => chamar(window.dm.selectTab(t.id)));
-    // Arrastar para reordenar, como no navegador. A metade da aba onde o mouse cai define antes ou depois.
+    // Arrastar para reordenar (a prévia e a soltura são tratadas pela barra, ver init).
     aba.draggable = true;
     aba.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('text/plain', t.id);
       e.dataTransfer.effectAllowed = 'move';
-      arrastandoAba = t.id;
+      iniciarArrasto('#abas', t.id);
       aba.classList.add('arrastando');
     });
-    aba.addEventListener('dragend', () => {
-      arrastandoAba = null;
-      limparPrevia('#abas');
-    });
-    aba.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      preverReordenacao('#abas', estado.openTabs, arrastandoAba, i);
-    });
-    aba.addEventListener('dragleave', () => aba.classList.remove('alvo-antes', 'alvo-depois'));
-    aba.addEventListener('drop', (e) => {
-      e.preventDefault();
-      const origem = e.dataTransfer.getData('text/plain');
-      const destino = destinoAoSoltar(estado.openTabs, origem, i);
-      limparAlvosAbas();
-      if (origem) chamar(window.dm.moveTab(origem, destino));
-    });
+    aba.addEventListener('dragend', encerrarArrasto);
     aba.appendChild(avatarDoServico(t.service));
     aba.appendChild(el('span', { className: 'nome' }, t.name));
     if (t.badge > 0) aba.appendChild(el('span', { className: 'badge' }, String(t.badge)));
@@ -266,33 +256,15 @@ function renderFavoritas() {
       e.preventDefault();
       chamar(window.dm.removeFavorite(f.id));
     });
-    // Arrastar para reordenar. Só aceita outro destaque (o tipo próprio evita confundir com as abas).
+    // Arrastar para reordenar (prévia e soltura pela faixa, ver init).
     chip.draggable = true;
     chip.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('application/x-dm-destaque', f.id);
+      e.dataTransfer.setData(TIPO_DESTAQUE, f.id);
       e.dataTransfer.effectAllowed = 'move';
-      arrastandoFav = f.id;
+      iniciarArrasto('#favoritas', f.id);
       chip.classList.add('arrastando');
     });
-    chip.addEventListener('dragend', () => {
-      arrastandoFav = null;
-      limparPrevia('#favoritas');
-    });
-    chip.addEventListener('dragover', (e) => {
-      if (!e.dataTransfer.types.includes('application/x-dm-destaque')) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      preverReordenacao('#favoritas', estado.favoritas, arrastandoFav, i);
-    });
-    chip.addEventListener('dragleave', () => chip.classList.remove('alvo-antes', 'alvo-depois'));
-    chip.addEventListener('drop', (e) => {
-      if (!e.dataTransfer.types.includes('application/x-dm-destaque')) return;
-      e.preventDefault();
-      const origem = e.dataTransfer.getData('application/x-dm-destaque');
-      const destino = destinoAoSoltar(estado.favoritas, origem, i);
-      limparAlvos('#favoritas .fav-chip');
-      if (origem) chamar(window.dm.moveFavorite(origem, destino));
-    });
+    chip.addEventListener('dragend', encerrarArrasto);
     barra.appendChild(chip);
   }
   animarReordenacao(barra, antes);
@@ -511,6 +483,35 @@ function render(novo) {
 }
 
 function init() {
+  // A prévia vale para a barra inteira: basta o ponteiro estar sobre ela, não sobre uma aba específica.
+  $('abas').addEventListener('dragover', (e) => {
+    if (!arrasto || arrasto.seletor !== '#abas') return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    atualizarPrevia(e.clientX);
+  });
+  $('abas').addEventListener('drop', (e) => {
+    if (!arrasto || arrasto.seletor !== '#abas') return;
+    e.preventDefault();
+    const origem = arrasto.id;
+    const destino = destinoDaPrevia();
+    arrasto.soltou = true;
+    chamar(window.dm.moveTab(origem, destino));
+  });
+  $('favoritas').addEventListener('dragover', (e) => {
+    if (!arrasto || arrasto.seletor !== '#favoritas' || !e.dataTransfer.types.includes(TIPO_DESTAQUE)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    atualizarPrevia(e.clientX);
+  });
+  $('favoritas').addEventListener('drop', (e) => {
+    if (!arrasto || arrasto.seletor !== '#favoritas' || !e.dataTransfer.types.includes(TIPO_DESTAQUE)) return;
+    e.preventDefault();
+    const origem = arrasto.id;
+    const destino = destinoDaPrevia();
+    arrasto.soltou = true;
+    chamar(window.dm.moveFavorite(origem, destino));
+  });
   $('btn-nova').addEventListener('click', (e) => {
     e.stopPropagation();
     definirMenu($('menu-nova').classList.contains('hidden'));
