@@ -548,9 +548,10 @@ function registerIpc() {
 function integrarAoSistema() {
   if (process.env.DM_DATA_DIR || process.env.DM_SHOT) return;
   try {
+    // Instalado por .deb/.rpm: o pacote já traz o atalho no menu, não cria outro.
+    if (app.isPackaged && !process.env.APPIMAGE) return;
     const comando = process.env.APPIMAGE ? [process.env.APPIMAGE]
-      : app.isPackaged ? [process.execPath]
-        : [process.execPath, path.join(__dirname, '..')];
+      : [process.execPath, path.join(__dirname, '..')];
     integrarSistema({ icone: ARQUIVO_ICONE, comando });
   } catch (err) {
     console.warn('não consegui instalar o atalho do sistema:', err.message);
