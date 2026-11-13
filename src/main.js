@@ -144,7 +144,9 @@ function layout() {
   if (!win) return;
   const [w, h] = win.getContentSize();
   const barra = alturaBarra();
-  const expandida = panelOpen || menuOpen;
+  // Sem nenhuma aba, a UI ocupa a janela toda: é ela que desenha o estado vazio ("Nenhuma conta aberta").
+  // Com a barra só, a área de baixo não era pintada por nenhuma view e ficava com restos de quadros.
+  const expandida = panelOpen || menuOpen || tabs.size === 0;
   uiView.setBounds({ x: 0, y: 0, width: w, height: expandida ? h : barra });
   // Todas as abas ocupam a mesma área; só a da frente fica por cima (ver selectTab).
   // Com o painel aberto, as páginas ficam sem área (a UI cobre a janela).

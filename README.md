@@ -25,7 +25,7 @@ O Dual Messenger abre várias contas de WhatsApp Web e Telegram Web numa janela 
 
 Este é um **projeto de estudo de UI/UX**. A interface foi desenhada e refeita para praticar design de interação: abas, faixa de destaques, estados da transcrição, configurações em painel lateral e temas.
 
-Versão atual: **0.1.13** · [Releases](https://github.com/mpjsilva/DualMessenger/releases) · [Desenvolvimento](#para-desenvolvedores)
+Versão atual: **0.1.14** · [Releases](https://github.com/mpjsilva/DualMessenger/releases) · [Desenvolvimento](#para-desenvolvedores)
 
 ## Principais diferenciais
 
@@ -56,19 +56,19 @@ E mais:
 
 ### Linux: AppImage (recomendado)
 
-1. Baixe `DualMessenger-0.1.13.AppImage` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (está no arquivo `.sha256` ao lado).
+1. Baixe `DualMessenger-0.1.14.AppImage` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (está no arquivo `.sha256` ao lado).
 2. Torne o arquivo executável e abra:
 
 ```bash
-chmod +x DualMessenger-0.1.13.AppImage
-./DualMessenger-0.1.13.AppImage
+chmod +x DualMessenger-0.1.14.AppImage
+./DualMessenger-0.1.14.AppImage
 ```
 
-> Em distribuições recentes, o AppImage pede o FUSE 2 (pacote `fuse-libs` no Fedora, `libfuse2` no Debian e no Ubuntu). Sem ele, rode com `./DualMessenger-0.1.13.AppImage --appimage-extract-and-run`.
+> Em distribuições recentes, o AppImage pede o FUSE 2 (pacote `fuse-libs` no Fedora, `libfuse2` no Debian e no Ubuntu). Sem ele, rode com `./DualMessenger-0.1.14.AppImage --appimage-extract-and-run`.
 
 ### Windows 10 e 11
 
-1. Baixe `DualMessenger-Setup-0.1.13.exe` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (arquivo `.sha256` ao lado).
+1. Baixe `DualMessenger-Setup-0.1.14.exe` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (arquivo `.sha256` ao lado).
 2. Execute o instalador. Ele instala para todos os usuários, pede permissão de administrador e deixa escolher a pasta de instalação.
 
 > O instalador não tem assinatura digital. Na primeira execução, o Windows pode mostrar um aviso do SmartScreen: clique em **Mais informações** e depois em **Executar assim mesmo**.
