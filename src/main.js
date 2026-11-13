@@ -14,6 +14,7 @@ const {
   Menu,
   nativeTheme,
   clipboard,
+  Tray,
 } = require('electron');
 const { readJson, writeJsonAtomic } = require('./store');
 const { ScriptManager } = require('./motor');
@@ -558,6 +559,46 @@ function integrarAoSistema() {
   }
 }
 
+// Preferências simples do app (arquivo no userData). Padrão: fechar a janela manda para a bandeja.
+let saindo = false;
+let tray = null;
+const arquivoPrefs = () => path.join(app.getPath('userData'), 'preferencias.json');
+const prefs = { fecharParaBandeja: true };
+
+function mostrarJanela() {
+  if (!win) createWindow();
+  win.show();
+  win.focus();
+}
+
+function montarBandeja() {
+  if (tray || process.env.DM_SHOT) return;
+  Object.assign(prefs, readJson(arquivoPrefs(), {}));
+  try {
+    tray = new Tray(iconeDoApp());
+  } catch (err) {
+    console.warn('não consegui criar o ícone da bandeja:', err.message);
+    return;
+  }
+  tray.setToolTip('Dual Messenger');
+  const atualizar = () => tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Abrir Dual Messenger', click: mostrarJanela },
+    {
+      label: 'Fechar para a bandeja',
+      type: 'checkbox',
+      checked: prefs.fecharParaBandeja,
+      click: (item) => {
+        prefs.fecharParaBandeja = item.checked;
+        try { writeJsonAtomic(arquivoPrefs(), prefs); } catch (err) { console.warn('prefs:', err.message); }
+      },
+    },
+    { type: 'separator' },
+    { label: 'Sair', click: () => { saindo = true; app.quit(); } },
+  ]));
+  atualizar();
+  tray.on('click', () => (win && win.isVisible() ? win.hide() : mostrarJanela()));
+}
+
 function createWindow() {
   win = new BaseWindow({
     width: 1280,
@@ -581,6 +622,12 @@ function createWindow() {
   win.contentView.addChildView(uiView);
 
   win.on('resize', layout);
+  // Fechar a janela só esconde: o app segue na bandeja (notificações continuam chegando).
+  win.on('close', (event) => {
+    if (saindo || !prefs.fecharParaBandeja || !tray) return;
+    event.preventDefault();
+    win.hide();
+  });
   win.on('closed', () => {
     win = null;
     uiView = null;
@@ -595,6 +642,13 @@ if (process.env.DM_DATA_DIR) app.setPath('userData', process.env.DM_DATA_DIR);
 if (process.platform === 'linux') app.setDesktopName(`${ID_APP}.desktop`);
 // No Windows, as notificações (toasts) só aparecem com o mesmo AppUserModelID do instalador (appId do package.json).
 if (process.platform === 'win32') app.setAppUserModelId('local.dualmessenger.app');
+
+// Uma instância só: abrir de novo (menu, ícone) traz a janela escondida na bandeja.
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0);
+} else {
+  app.on('second-instance', () => app.isReady() && mostrarJanela());
+}
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null); // sem a barra padrão do Electron (File, Edit, View…)
@@ -611,6 +665,7 @@ app.whenReady().then(async () => {
 
   registerIpc();
   createWindow();
+  montarBandeja();
 
   // Reabre as abas que estavam abertas ao fechar o app.
   const toRestore = state.openTabs.filter((id) => accountById(id));
@@ -716,6 +771,8 @@ app.whenReady().then(async () => {
   }
 });
 
+app.on('before-quit', () => { saindo = true; });
 app.on('window-all-closed', () => {
-  app.quit();
+  if (!tray || saindo || !prefs.fecharParaBandeja) app.quit();
 });
+app.on('activate', mostrarJanela);

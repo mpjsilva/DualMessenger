@@ -1,7 +1,7 @@
 {
   "name": "dual-messenger-app",
   "productName": "Dual Messenger",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "Vários WhatsApp Web e Telegram Web em abas isoladas, com transcrição local de mensagens de voz e userscripts.",
   "main": "src/main.js",
   "author": "mpjsilva",
@@ -33,6 +33,11 @@
       ],
       "category": "Network;InstantMessaging",
       "icon": "assets/icone.png",
+      "desktop": {
+        "entry": {
+          "StartupWMClass": "local.dualmessenger.app"
+        }
+      },
       "maintainer": "mpjsilva <56980262+mpjsilva@users.noreply.github.com>"
     },
     "files": [
