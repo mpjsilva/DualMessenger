@@ -13,6 +13,7 @@ const {
   shell,
   Menu,
   nativeTheme,
+  clipboard,
 } = require('electron');
 const { readJson, writeJsonAtomic } = require('./store');
 const { ScriptManager } = require('./motor');
@@ -25,6 +26,7 @@ const { moverAba } = require('./abas');
 const { integrarSistema, ID_APP } = require('./sistema-linux');
 const { linkPermitido } = require('./links');
 const { SERVICOS_COM_LISTA, scriptLerLista, scriptAbrirConversa } = require('./conversas');
+const { montarModelo } = require('./menu-contexto');
 
 // Script que põe o botão "Transcrever" nas mensagens de voz (roda na página do WhatsApp).
 const PAGINA_WHATSAPP = fs.readFileSync(path.join(__dirname, 'pagina-whatsapp.js'), 'utf8');
@@ -208,6 +210,17 @@ async function openAccount(accountId, selecionar = true) {
       shell.openExternal(url);
     }
     return { action: 'deny' };
+  });
+  // Botão direito: Copiar, Colar, Copiar imagem, links e correção ortográfica.
+  wc.on('context-menu', (_event, params) => {
+    const modelo = montarModelo(params, {
+      substituirPalavra: (palavra) => wc.replaceMisspelling(palavra),
+      abrirLink: (url) => shell.openExternal(url),
+      copiarTexto: (texto) => clipboard.writeText(texto),
+      copiarImagem: (x, y) => wc.copyImageAt(x, y),
+      salvarImagem: (url) => wc.downloadURL(url),
+    });
+    if (modelo.length) Menu.buildFromTemplate(modelo).popup({ window: win });
   });
   wc.on('page-title-updated', (event, title) => {
     entry.title = title;
