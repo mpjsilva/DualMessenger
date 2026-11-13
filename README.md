@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>WhatsApp Web e Telegram Web em abas, cada conta com o seu login</b>, e transcrição das mensagens de voz no próprio computador.<br>
-  Feito com Electron, para Linux.
+  Feito com Electron, para Linux e Windows.
 </p>
 
 <p align="center">
@@ -42,7 +42,7 @@ E mais:
 - **Tema claro, escuro ou automático**, em **Opções › Aparência** ou pelo botão lua/sol da barra. O tema vale também para as páginas das contas, via `nativeTheme` do Electron.
 - **Notificações**: clicar numa notificação de WhatsApp ou Telegram traz a janela para frente e seleciona a conta que a enviou.
 - **Manual no próprio app**, em **Opções › Manual**, e **Créditos** com as licenças de cada componente.
-- **Ícone no menu de aplicativos**: ao abrir, o app grava o ícone e um atalho em `~/.local/share`.
+- **Ícone no menu de aplicativos (Linux)**: ao abrir, o app grava o ícone e um atalho em `~/.local/share`. No Windows, a instalação cria o atalho do menu Iniciar.
 
 ## Telas
 
@@ -54,7 +54,7 @@ E mais:
 
 ## Instalação
 
-### Pelo AppImage (recomendado)
+### Linux: AppImage (recomendado)
 
 1. Baixe `DualMessenger-0.1.12.AppImage` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (está no arquivo `.sha256` ao lado).
 2. Torne o arquivo executável e abra:
@@ -69,13 +69,13 @@ chmod +x DualMessenger-0.1.12.AppImage
 ### Windows 10 e 11
 
 1. Baixe `DualMessenger-Setup-0.1.12.exe` na página de [Releases](https://github.com/mpjsilva/DualMessenger/releases) e confira o SHA-256 (arquivo `.sha256` ao lado).
-2. Execute o instalador. Ele instala para todos os usuários e pede permissão de administrador.
+2. Execute o instalador. Ele instala para todos os usuários, pede permissão de administrador e deixa escolher a pasta de instalação.
 
-> No Windows, o **Preparar** baixa prontos o `whisper-cli.exe` (whisper.cpp v1.8.2) e o `ffmpeg.exe` (FFmpeg 8.1, build LGPL), conferindo o SHA-256 de cada um, e depois o modelo de voz. Não há compilação. A transcrição no Windows ainda não foi testada numa máquina Windows real.
+> O instalador não tem assinatura digital. Na primeira execução, o Windows pode mostrar um aviso do SmartScreen: clique em **Mais informações** e depois em **Executar assim mesmo**.
 
-O AppImage não inclui o whisper.cpp, o modelo de voz nem o ffmpeg. O botão **Preparar**, descrito abaixo, instala o que falta (inclusive o ffmpeg), compila o whisper.cpp e baixa o modelo.
+Nem o AppImage nem o instalador incluem o whisper.cpp, o modelo de voz ou o ffmpeg. O botão **Preparar**, descrito abaixo, instala o que falta: no Linux, compila o whisper.cpp; no Windows, baixa os binários prontos. Nos dois, depois baixa o modelo de voz.
 
-### Pelo código-fonte
+### Pelo código-fonte (Linux ou Windows)
 
 Precisa de Node.js com npm.
 
@@ -88,13 +88,15 @@ npm start
 
 ## Transcrição de mensagens de voz
 
-1. Em **Opções › Transcrição**, toque em **Preparar** uma vez. O app instala o que falta, compila o whisper.cpp e baixa o modelo Whisper small (487 MB), que transcreve em português. O código do whisper.cpp vem do GitHub e o modelo do Hugging Face.
+1. Em **Opções › Transcrição**, toque em **Preparar** uma vez. O app baixa o modelo Whisper small (487 MB), que transcreve em português. No Linux, ele instala o que falta e compila o whisper.cpp, com código do GitHub. No Windows, baixa o `whisper-cli.exe` (whisper.cpp v1.8.2) e o `ffmpeg.exe` (FFmpeg 8.1, build LGPL) já prontos, conferindo o SHA-256 de cada um, sem compilar nada. O modelo vem do Hugging Face.
 2. Depois, cada mensagem de voz do WhatsApp e do Telegram ganha o botão **Transcrever**. O texto aparece aos poucos, a cada trecho de 15 segundos de áudio, e a versão final substitui o texto parcial.
 3. O resultado fica guardado no computador (`transcricoes.json`, na pasta de dados do app). Transcrever o mesmo áudio de novo usa o texto guardado.
 
-> **Requisitos:** o **Preparar** instala `git`, `cmake`, `g++` e `ffmpeg` com o `dnf`, pedindo a senha do sistema só se algum faltar. No Fedora, o `ffmpeg` vem do RPM Fusion: ative-o antes. Em outras distribuições, instale esses quatro programas antes do Preparar.
+> **Requisitos no Linux:** o **Preparar** instala `git`, `cmake`, `g++` e `ffmpeg` com o `dnf`, pedindo a senha do sistema só se algum faltar. No Fedora, o `ffmpeg` vem do RPM Fusion: ative-o antes. Em outras distribuições, instale esses quatro programas antes do Preparar.
 
-> **Velocidade:** a transcrição leva mais tempo que o áudio. Num dos computadores de teste, uma mensagem de 0:50 levou cerca de 31 segundos; o tempo depende da CPU.
+> **Requisitos no Windows:** Windows 10 ou 11 de 64 bits, com espaço para o modelo (487 MB) e as ferramentas. Não é preciso instalar nada antes.
+
+> **Velocidade:** a transcrição leva mais tempo que o áudio. Num dos computadores de teste (Linux), uma mensagem de 0:50 levou cerca de 31 segundos; o tempo depende da CPU.
 
 ## Controles principais
 
@@ -138,7 +140,8 @@ npm start
 npm install
 npm start          # abre o app
 npm test           # testes unitários
-npm run dist       # gera o AppImage em dist/
+npm run dist       # gera o AppImage em dist/ (Linux)
+npm run dist:win    # gera o instalador do Windows em dist/win/ (usa o container electronuserland/builder:wine)
 ```
 
 Diagnóstico: `DM_DEVTOOLS=1 npm start` abre o DevTools de cada conta, para inspecionar o HTML das mensagens.
@@ -156,11 +159,12 @@ WHISPER_BIN=... MODELO=... AUDIO=... node tests/smoke-transcricao.js   # WAV 16 
 - No Telegram, o Transcrever toca a mensagem por um instante para carregar o áudio (e pausa logo depois). Se o áudio demorar, o app espera até 30 segundos. Os seletores seguem o Telegram Web A e podem mudar com as atualizações dele.
 - Os destaques dependem da lista de conversas de cada site, lida pelos seletores de `src/conversas.js`. Grupos e conversas fora da lista carregada podem não ser encontrados.
 - O instalador do **Preparar** no Linux conhece só o `dnf`. Em outras distribuições, a instalação das ferramentas é manual. No Windows, o whisper.cpp fica na versão 1.8.2, a última com binário pronto.
-- O ícone no GNOME (dock, Alt+Tab, Atividades) não foi testado numa área de trabalho real.
+- No Linux, o ícone no GNOME (dock, Alt+Tab, Atividades) não foi testado numa área de trabalho real.
+- No Windows, o instalador e a transcrição ainda não foram testados numa máquina Windows real. O instalador não é assinado digitalmente, então o SmartScreen avisa na primeira execução.
 - O aviso de clique em notificação cobre as notificações criadas pela página. Notificações enviadas por service worker (push em segundo plano) não passam por ele.
 - O tema das contas depende de cada site seguir o modo claro/escuro do sistema. No Electron isso foi verificado; nas contas, o resultado depende do site.
 - A arrastar com prévia e a animação foram testados por lógica e build; o gesto na janela ainda deve ser conferido em cada versão.
-- Userscripts: o script é injetado quando a página termina de carregar (`dom-ready`); o `@run-at` é ignorado: todos os scripts rodam quando a página termina de carregar.
+- Userscripts: os scripts são injetados quando a página termina de carregar; o `@run-at` é ignorado.
 - `GM_addValueChangeListener` avisa só alterações feitas na própria página; as outras páginas não recebem o aviso.
 - `@connect` é conferido quando o script declara algum; sem ele, `GM_xmlhttpRequest` aceita qualquer http(s). `@connect self` não é reconhecido.
 - Os `@require` e `@resource` ficam em cache em `userscripts/cache` e não são baixados de novo sozinhos; apague o arquivo da pasta para forçar a atualização.
@@ -172,12 +176,12 @@ O Dual Messenger só existe porque outros projetos livres fazem o trabalho pesad
 
 **Base do app**
 - **[Electron](https://www.electronjs.org)**: a janela e o navegador embutido de cada conta (licença MIT).
-- **[electron-builder](https://www.electron.build)**: gera o AppImage.
+- **[electron-builder](https://www.electron.build)**: gera o AppImage e o instalador NSIS do Windows.
 
 **Transcrição**
 - **[whisper.cpp](https://github.com/ggml-org/whisper.cpp)**, de ggml-org (licença MIT): a transcrição no computador.
 - **Whisper**, da [OpenAI](https://openai.com), o modelo de voz usado pelo whisper.cpp, baixado do [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) no **Preparar**.
-- **[FFmpeg](https://ffmpeg.org)** (LGPL ou GPL, conforme a build): converte os áudios para a transcrição.
+- **[FFmpeg](https://ffmpeg.org)** (LGPL ou GPL, conforme a build): converte os áudios para a transcrição. No Windows, o app baixa a build LGPL compartilhada do [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds).
 
 **Userscripts**
 - Os scripts usam o cabeçalho `==UserScript==` e a API do [Tampermonkey](https://www.tampermonkey.net), extensão que popularizou o formato.
