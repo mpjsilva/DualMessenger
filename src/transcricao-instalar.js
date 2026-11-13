@@ -35,6 +35,40 @@ const FONTES_WINDOWS = {
   },
 };
 
+// Visual C++ (MSVCP140, VCRUNTIME140, VCRUNTIME140_1): o whisper-cli.exe precisa delas, e nem todo Windows as tem.
+// Usa o instalador oficial da Microsoft (aka.ms); no Windows, a assinatura digital é conferida antes de rodar.
+const VC_REDIST_URL = 'https://aka.ms/vs/17/release/vc_redist.x64.exe';
+const DLLS_VC = ['MSVCP140.dll', 'VCRUNTIME140.dll', 'VCRUNTIME140_1.dll'];
+
+function vcRuntimeInstalado(sistema = process.env.SystemRoot || 'C:\\Windows') {
+  return DLLS_VC.every((dll) => fs.existsSync(path.join(sistema, 'System32', dll)));
+}
+
+const aspas = (texto) => `'${String(texto).replace(/'/g, "''")}'`;
+
+async function garantirVCRuntime(ferramentas, aoProgresso) {
+  if (vcRuntimeInstalado()) return;
+  fs.mkdirSync(ferramentas, { recursive: true });
+  const exe = path.join(ferramentas, 'vc_redist.x64.exe');
+  // Sem hash fixo: a Microsoft atualiza esse instalador. A garantia é a assinatura, conferida abaixo.
+  await baixarVerificado(VC_REDIST_URL, exe, null, aoProgresso);
+  const assinado = spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+    `$s = Get-AuthenticodeSignature -LiteralPath ${aspas(exe)}; if ($s.Status -eq 'Valid' -and $s.SignerCertificate.Subject -like '*Microsoft*') { exit 0 } else { exit 2 }`],
+  { stdio: 'ignore' });
+  if (assinado.status !== 0) {
+    fs.rmSync(exe, { force: true });
+    throw new Error('o instalador do Visual C++ não tem assinatura válida da Microsoft');
+  }
+  // Pede permissão de administrador (UAC) e instala em silêncio.
+  const r = spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+    `$p = Start-Process -FilePath ${aspas(exe)} -ArgumentList '/install','/quiet','/norestart' -Verb RunAs -Wait -PassThru; exit $p.ExitCode`],
+  { stdio: 'ignore' });
+  fs.rmSync(exe, { force: true });
+  if (!vcRuntimeInstalado()) {
+    throw new Error(`não consegui instalar o Visual C++ (código ${r.status}); instale o Microsoft Visual C++ Redistributable x64 e tente de novo`);
+  }
+}
+
 // Ferramentas do sistema e o pacote Fedora que as fornece (só Linux).
 const FERRAMENTAS = [
   { cmd: 'git', args: ['--version'], pacote: 'git' },
@@ -130,7 +164,7 @@ async function baixarVerificado(url, destino, sha256, aoProgresso = () => {}) {
     if (total) aoProgresso(lido / total);
   }
   await new Promise((resolve, reject) => saida.end((err) => (err ? reject(err) : resolve())));
-  if (hash.digest('hex') !== sha256) {
+  if (sha256 && hash.digest('hex') !== sha256) {
     fs.rmSync(parcial, { force: true });
     throw new Error(`${path.basename(destino)} não confere (SHA-256 diferente); tente de novo`);
   }
@@ -225,6 +259,10 @@ function criarInstalador({ dataDir, appDir, plataforma = process.platform, fonte
   }
 
   async function instalarWindows(aoEtapa) {
+    if (!vcRuntimeInstalado()) {
+      aoEtapa({ etapa: 'vcredist', pct: null, texto: 'Instalando o Visual C++ (pode pedir permissão de administrador)…' });
+      await garantirVCRuntime(c.ferramentas, (p) => aoEtapa({ etapa: 'vcredist', pct: p, texto: 'Baixando o Visual C++…' }));
+    }
     if (!fs.existsSync(c.whisperBin)) {
       const pasta = await baixarFerramentaWindows(fontesWindows.whisper, 'whisper', (p) =>
         aoEtapa({ etapa: 'whisper', pct: p, texto: 'Baixando o whisper.cpp…' }));
@@ -285,4 +323,4 @@ function criarInstalador({ dataDir, appDir, plataforma = process.platform, fonte
   return { estado, instalar, ferramentasFaltando };
 }
 
-module.exports = { criarInstalador, caminhos, baixarModelo, baixarVerificado, FONTES_WINDOWS };
+module.exports = { criarInstalador, caminhos, baixarModelo, baixarVerificado, vcRuntimeInstalado, FONTES_WINDOWS };

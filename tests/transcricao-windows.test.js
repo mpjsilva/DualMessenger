@@ -67,3 +67,15 @@ test('baixarVerificado recusa hash diferente e não deixa arquivo para trás', a
     servidor.close();
   }
 });
+
+test('vcRuntimeInstalado só vale quando as três DLLs do Visual C++ estão em System32', () => {
+  const { vcRuntimeInstalado } = require('../src/transcricao-instalar');
+  const sistema = pastaTemp('sistema');
+  assert.equal(vcRuntimeInstalado(sistema), false);
+  const sys32 = path.join(sistema, 'System32');
+  fs.mkdirSync(sys32, { recursive: true });
+  for (const dll of ['MSVCP140.dll', 'VCRUNTIME140.dll']) fs.writeFileSync(path.join(sys32, dll), '');
+  assert.equal(vcRuntimeInstalado(sistema), false, 'falta VCRUNTIME140_1.dll');
+  fs.writeFileSync(path.join(sys32, 'VCRUNTIME140_1.dll'), '');
+  assert.equal(vcRuntimeInstalado(sistema), true);
+});

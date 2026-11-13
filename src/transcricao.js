@@ -103,6 +103,8 @@ function run(bin, args) {
     proc.on('error', reject);
     proc.on('close', (code) => {
       if (code === 0) resolve();
+      // 0xC0000135 (3221225781): uma DLL necessária não foi encontrada (no Windows, quase sempre o Visual C++).
+      if (code === 3221225781) reject(new Error('faltam componentes do Windows (Visual C++). Abra Opções › Transcrição e toque em Preparar de novo'));
       else reject(new Error(`${path.basename(bin)} saiu com código ${code}: ${erro.trim().slice(-300)}`));
     });
   });
