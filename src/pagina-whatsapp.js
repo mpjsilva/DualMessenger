@@ -64,13 +64,40 @@
     if (!msg) throw new Error('mensagem não encontrada; role a conversa até ela e tente de novo');
     if (!tipos.includes(msg.type)) throw new Error(tipos.includes('video') ? 'esta mensagem não é um vídeo' : 'esta mensagem não é um áudio');
 
-    for (let tentativa = 0; tentativa < 20; tentativa++) {
-      if (msg.filehash) {
+    // O blob do vídeo só entra no cache depois do download: getOrCreateURL lança erro enquanto não entrou
+    // ("There is no blob matching filehash"). Então baixa (e espera) e tenta de novo.
+    const doCache = async () => {
+      if (!msg.filehash) return null;
+      try {
         const url = m.Cache.getOrCreateURL(msg.filehash);
-        if (url) return (await fetch(url)).blob();
+        return url ? (await fetch(url)).blob() : null;
+      } catch (e) {
+        return null;
       }
-      if (tentativa === 0 && msg.downloadMedia) {
-        msg.downloadMedia({ downloadEvenIfExpensive: true, rmrReason: 1, isUserInitiated: true }).catch(() => {});
+    };
+    const doMediaData = async () => {
+      try {
+        const b = msg.mediaData && msg.mediaData.mediaBlob;
+        if (!b) return null;
+        if (typeof b.forceToBlob === 'function') return await b.forceToBlob();
+        if (typeof b.blob === 'function') return await b.blob();
+        return b instanceof Blob ? b : null;
+      } catch (e) {
+        return null;
+      }
+    };
+    let baixou = false;
+    for (let tentativa = 0; tentativa < 40; tentativa++) {
+      const blob = (await doCache()) || (await doMediaData());
+      if (blob && blob.size > 0) return blob;
+      if (!baixou && msg.downloadMedia) {
+        baixou = true;
+        try {
+          await msg.downloadMedia({ downloadEvenIfExpensive: true, rmrReason: 1, isUserInitiated: true });
+          continue;
+        } catch (e) {
+          // segue tentando: pode ter baixado mesmo assim
+        }
       }
       await new Promise((r) => setTimeout(r, 700));
     }
