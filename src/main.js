@@ -28,6 +28,7 @@ const { integrarSistema, ID_APP } = require('./sistema-linux');
 const { linkPermitido } = require('./links');
 const { SERVICOS_COM_LISTA, scriptLerLista, scriptAbrirConversa } = require('./conversas');
 const { montarModelo } = require('./menu-contexto');
+const { criarAtualizador } = require('./atualizador');
 
 // Script que põe o botão "Transcrever" nas mensagens de voz (roda na página do WhatsApp).
 const PAGINA_WHATSAPP = fs.readFileSync(path.join(__dirname, 'pagina-whatsapp.js'), 'utf8');
@@ -584,6 +585,7 @@ function integrarAoSistema() {
 // Preferências simples do app (arquivo no userData). Padrão: fechar a janela manda para a bandeja.
 let saindo = false;
 let tray = null;
+let atualizador = null;
 const arquivoPrefs = () => path.join(app.getPath('userData'), 'preferencias.json');
 const prefs = { fecharParaBandeja: true, transcricaoAuto: false, transcricaoVideos: true };
 const opcoesTranscricao = () => ({ auto: prefs.transcricaoAuto, videos: prefs.transcricaoVideos });
@@ -617,6 +619,7 @@ function montarBandeja() {
         salvarPrefs();
       },
     },
+    { label: 'Buscar atualização', click: () => atualizador && atualizador.verificar({ pedido: true }) },
     { type: 'separator' },
     { label: 'Sair', click: () => { saindo = true; app.quit(); } },
   ]));
@@ -692,6 +695,18 @@ app.whenReady().then(async () => {
   registerIpc();
   createWindow();
   montarBandeja();
+  // Atualização automática: só no app instalado (AppImage, .deb, .rpm, instalador do Windows).
+  if (app.isPackaged && !process.env.DM_DATA_DIR && !process.env.DM_SHOT) {
+    const { autoUpdater } = require('electron-updater');
+    atualizador = criarAtualizador({
+      autoUpdater,
+      dialog,
+      janela: () => (win && win.isVisible() ? win : null),
+      antesDeSair: () => { saindo = true; },
+      log: (...a) => console.warn('[atualizador]', ...a),
+    });
+    setTimeout(() => atualizador.iniciar(), 10000);
+  }
 
   // Reabre as abas que estavam abertas ao fechar o app.
   const toRestore = state.openTabs.filter((id) => accountById(id));

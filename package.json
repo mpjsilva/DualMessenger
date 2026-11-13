@@ -1,7 +1,7 @@
 {
   "name": "dual-messenger-app",
   "productName": "Dual Messenger",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "description": "Vários WhatsApp Web e Telegram Web em abas isoladas, com transcrição local de mensagens de voz e userscripts.",
   "main": "src/main.js",
   "author": "mpjsilva",
@@ -68,10 +68,20 @@
     },
     "directories": {
       "output": "dist/${version}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "mpjsilva",
+        "repo": "DualMessenger"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "45.3.0",
     "electron-builder": "26.18.1"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }
