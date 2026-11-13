@@ -560,6 +560,7 @@ html.menu-aberto, html.menu-aberto body { background: transparent !important; }
 .item .sub { color: var(--texto-2); font-size: 12px; word-break: break-all; margin-top: 3px; }
 .item .erro-txt { color: var(--vermelho); font-size: 12px; margin-top: 4px; }
 .item .controles { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.aba .editar-nome { flex: 1; min-width: 0; font-size: 13px; padding: 2px 6px; }
 .editar-nome {
   width: 100%;
   font: 500 14px -apple-system, BlinkMacSystemFont, system-ui, sans-serif;

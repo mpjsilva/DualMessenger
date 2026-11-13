@@ -3,6 +3,7 @@
 // Interface da barra de abas e das Opções. Todo texto vindo do app entra com textContent (nunca innerHTML).
 
 let estado = null;
+let editandoAba = null; // aba com o nome em edição: a barra não é redesenhada enquanto isso
 let editandoConta = null; // conta com o nome em edição: a lista não é redesenhada enquanto isso
 let chaveListaFrente = null; // evita refazer o menu de conversas (e perder a escolha) a cada atualização
 
@@ -185,6 +186,7 @@ function animarReordenacao(barra, antes) {
 // Tira as marcas de arrastar. Com `tudo` falso, mantém o arrastar em andamento na aba (só limpa as marcas de alvo).
 
 function renderAbas() {
+  if (editandoAba) return;
   const barra = $('abas');
   const antes = capturarPosicoes(barra);
   barra.textContent = '';
@@ -194,6 +196,10 @@ function renderAbas() {
     const aba = el('div', { className: 'aba' + (t.id === estado.activeId ? ' ativa' : ''), title: (t.title || t.name) + dica });
     aba.dataset.id = t.id;
     aba.addEventListener('click', () => chamar(window.dm.selectTab(t.id)));
+    aba.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      chamar(window.dm.menuAba(t.id));
+    });
     // Arrastar para reordenar (a prévia e a soltura são tratadas pela barra, ver init).
     aba.draggable = true;
     aba.addEventListener('dragstart', (e) => {
@@ -427,6 +433,34 @@ function renderScripts() {
   }
 }
 
+// Renomeia direto na aba: o nome vira um campo de texto. Enter salva, Esc cancela.
+function renomearNaAba(id) {
+  const conta = estado.accounts.find((a) => a.id === id);
+  const nome = document.querySelector(`#abas .aba[data-id="${CSS.escape(id)}"] .nome`);
+  if (!conta || !nome || editandoAba) return;
+  editandoAba = id;
+  const input = el('input', { className: 'editar-nome', type: 'text', maxlength: '40', 'aria-label': 'Nome da conta' });
+  input.value = conta.name;
+  input.addEventListener('click', (e) => e.stopPropagation());
+  let feito = false;
+  const concluir = (salvar) => {
+    if (feito) return;
+    feito = true;
+    const novo = input.value.trim();
+    editandoAba = null;
+    renderAbas();
+    if (salvar && novo && novo !== conta.name) chamar(window.dm.renameAccount(id, novo));
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') concluir(true);
+    if (e.key === 'Escape') concluir(false);
+  });
+  input.addEventListener('blur', () => concluir(true));
+  nome.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
 // Troca o nome da conta por um campo de texto no próprio lugar. Enter salva, Esc cancela.
 function iniciarRenomear(conta, titulo) {
   editandoConta = conta.id;
@@ -621,6 +655,7 @@ function init() {
   $('btn-tr').addEventListener('click', () => chamar(window.dm.prepararTranscricao()));
 
   window.dm.onStateChanged(render);
+  window.dm.onRenomearAba(renomearNaAba);
   window.dm.getState().then((r) => {
     if (r.ok) render(r.value);
     else mostrarErro(r.error);

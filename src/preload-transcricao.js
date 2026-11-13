@@ -30,6 +30,7 @@ if (SITES_TRANSCRICAO.includes(location.hostname)) {
       resposta = await ipcRenderer.invoke('transcricao:pedir', {
         id: d.id,
         ext: d.ext,
+        video: d.video === true,
         bytes: new Uint8Array(d.buffer),
         reqId: d.reqId,
       });

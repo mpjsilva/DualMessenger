@@ -145,6 +145,9 @@
   };
 
   function extensaoDe(tipo) {
+    if (/quicktime/.test(tipo)) return 'mov';
+    if (/3gpp/.test(tipo)) return '3gp';
+    if (/matroska/.test(tipo)) return 'mkv';
     if (/ogg/.test(tipo)) return 'ogg';
     if (/mp4|m4a|aac/.test(tipo)) return 'mp4';
     if (/webm/.test(tipo)) return 'webm';
@@ -154,7 +157,7 @@
 
   // Manda o áudio ao app pela ponte (src/preload-transcricao.js) e espera a resposta.
   // Cada trecho transcrito chega como 'dm-transcricao:parcial' (onParcial) e renova o prazo de 5 min sem resposta.
-  function pedirAoApp(id, buffer, ext, onParcial) {
+  function pedirAoApp(id, buffer, ext, onParcial, video = false) {
     return new Promise((resolve, reject) => {
       const reqId = crypto.randomUUID();
       const PRAZO = 5 * 60 * 1000;
@@ -181,7 +184,7 @@
       }
       prazo();
       window.addEventListener('message', ouvir);
-      window.postMessage({ canal: 'dm-transcricao:pedido', reqId, id, ext, buffer }, location.origin, [buffer]);
+      window.postMessage({ canal: 'dm-transcricao:pedido', reqId, id, ext, video, buffer }, location.origin, [buffer]);
     });
   }
 
@@ -277,6 +280,74 @@
     }
   }
 
+  // Vídeo: pega o endereço (blob: ou /progressive/) do <video> da própria mensagem e baixa o arquivo.
+  // Se o vídeo ainda não carregou, aperta o controle de baixar/tocar uma vez e espera até 30 s.
+  async function obterVideo(linha, id) {
+    const achar = () => {
+      const v = linha.querySelector('video');
+      const url = v && (v.currentSrc || v.src);
+      return url && (url.startsWith('blob:') || url.includes('/progressive/')) ? url : null;
+    };
+    let url = achar();
+    if (!url) {
+      const controle = linha.querySelector('.Video .download-button, .Video .media-loading, .Video');
+      if (controle) apertar(controle);
+      const limite = Date.now() + 30000;
+      while (!url && Date.now() < limite) {
+        await new Promise((r) => setTimeout(r, 300));
+        url = achar();
+      }
+    }
+    if (!url) throw new Error('o vídeo ainda não carregou; toque nele uma vez e tente de novo');
+    return baixarVoz(url, id);
+  }
+
+  async function transcreverVideo(botao, area, linha, id) {
+    botao.disabled = true;
+    botao.textContent = 'Carregando vídeo…';
+    try {
+      const blob = await obterVideo(linha, id);
+      botao.textContent = 'Transcrevendo…';
+      const buffer = await blob.arrayBuffer();
+      const r = await pedirAoApp(id, buffer, extensaoDe(blob.type || 'video/mp4'), (texto) => {
+        if (texto) mostrar(area, texto);
+      }, true);
+      if (!r.ok) throw new Error(r.erro);
+      mostrar(area, r.texto || '(sem fala reconhecível)');
+      botao.remove();
+    } catch (err) {
+      mostrarAviso(area, frase(err.message));
+      botao.disabled = false;
+      botao.textContent = 'Transcrever vídeo';
+    }
+  }
+
+  function montarBotaoVideo(linha, referencia) {
+    const barra = document.createElement('div');
+    barra.className = 'dm-tr';
+    const botao = document.createElement('button');
+    botao.type = 'button';
+    botao.textContent = 'Transcrever vídeo';
+    const area = document.createElement('div');
+    botao.addEventListener('click', (e) => {
+      e.stopPropagation();
+      transcreverVideo(botao, area, linha, linha.dataset.messageId);
+    });
+    barra.appendChild(botao);
+    barra.appendChild(area);
+    referencia.insertAdjacentElement('afterend', barra);
+  }
+
+  function varrerVideos() {
+    for (const midia of document.querySelectorAll('.Video')) {
+      const linha = midia.closest('[data-message-id]');
+      if (!linha || linha.querySelector('.dm-tr')) continue;
+      // Figurinhas e GIFs animados não são vídeo com fala: só mídia dentro do balão da mensagem.
+      const alvo = midia.closest('.media-inner') || midia;
+      montarBotaoVideo(linha, alvo);
+    }
+  }
+
   function montarBotao(id, audio) {
     const barra = document.createElement('div');
     barra.className = 'dm-tr';
@@ -308,8 +379,9 @@
   let agendado = null;
   const observer = new MutationObserver(() => {
     clearTimeout(agendado);
-    agendado = setTimeout(varrer, 400);
+    agendado = setTimeout(() => { varrer(); varrerVideos(); }, 400);
   });
   observer.observe(document.body, { childList: true, subtree: true });
   varrer();
+  varrerVideos();
 })();

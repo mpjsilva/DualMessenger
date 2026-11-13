@@ -11,8 +11,10 @@ const { transcreverArquivo } = require('./transcricao');
 const { resolverConfigTranscricao } = require('./transcricao-config');
 const { readJson, writeJsonAtomic } = require('./store');
 
-const EXTENSOES = new Set(['ogg', 'opus', 'mp4', 'm4a', 'webm', 'mp3', 'wav']);
-const TAMANHO_MAX = 25 * 1024 * 1024;
+const EXTENSOES_VIDEO = new Set(['mov', '3gp', 'mkv', 'avi']);
+const EXTENSOES = new Set(['ogg', 'opus', 'mp4', 'm4a', 'webm', 'mp3', 'wav', ...EXTENSOES_VIDEO]);
+const TAMANHO_MAX = 25 * 1024 * 1024;          // áudio
+const TAMANHO_MAX_VIDEO = 200 * 1024 * 1024;   // vídeo (o ffmpeg extrai só o áudio)
 
 function criarServicoTranscricao({ dataDir, appDir }) {
   const cachePath = path.join(dataDir, 'transcricoes.json');
@@ -33,11 +35,13 @@ function criarServicoTranscricao({ dataDir, appDir }) {
   }
 
   // opcoes.onParcial(texto): texto até o trecho atual (ver transcreverArquivo). Com cache, não há parciais.
-  async function transcrever({ id, bytes, ext }, opcoes = {}) {
+  async function transcrever({ id, bytes, ext, video }, opcoes = {}) {
     if (typeof id !== 'string' || id.length < 1 || id.length > 300) throw new Error('mensagem inválida');
     if (!EXTENSOES.has(ext)) throw new Error('formato de áudio não suportado');
     if (!bytes || !bytes.byteLength) throw new Error('áudio vazio');
-    if (bytes.byteLength > TAMANHO_MAX) throw new Error('áudio grande demais (limite de 25 MB)');
+    const ehVideo = video === true || EXTENSOES_VIDEO.has(ext);
+    if (!ehVideo && bytes.byteLength > TAMANHO_MAX) throw new Error('áudio grande demais (limite de 25 MB)');
+    if (ehVideo && bytes.byteLength > TAMANHO_MAX_VIDEO) throw new Error('vídeo grande demais (limite de 200 MB)');
 
     // A chave é o conteúdo do áudio, não o id: o id de uma mensagem do Telegram só é único dentro da conversa.
     const chave = createHash('sha256').update(Buffer.from(bytes)).digest('hex');
@@ -57,4 +61,4 @@ function criarServicoTranscricao({ dataDir, appDir }) {
   return { transcrever };
 }
 
-module.exports = { criarServicoTranscricao, EXTENSOES, TAMANHO_MAX };
+module.exports = { criarServicoTranscricao, EXTENSOES, TAMANHO_MAX, TAMANHO_MAX_VIDEO };

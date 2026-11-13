@@ -106,3 +106,9 @@ test('erro no onParcial não interrompe a transcrição', async () => {
   const r = await transcreverArquivo(entrada, config, { onParcial: () => { throw new Error('página fechada'); } });
   assert.equal(r.texto, 'trecho0.wav trecho1.wav trecho2.wav');
 });
+
+test('ffmpeg ignora a faixa de vídeo (-vn) e extrai só o áudio', () => {
+  const args = buildFfmpegArgs('video.mp4', 'audio.wav');
+  assert.ok(args.includes('-vn'));
+  assert.equal(args.indexOf('-vn') > args.indexOf('-i'), true);
+});

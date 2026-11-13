@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('dm', {
   openFavorite: (id) => call('fav:open', id),
   moveFavorite: (id, destino) => call('fav:move', id, destino),
   abrirLink: (url) => call('link:abrir', url),
+  menuAba: (id) => call('tab:menu', id),
   renameAccount: (id, nome) => call('account:rename', id, nome),
   setTheme: (tema) => call('tema:set', tema),
   prepararTranscricao: () => call('transcricao:instalar'),
@@ -30,6 +31,9 @@ contextBridge.exposeInMainWorld('dm', {
   addDomain: (dominio) => call('dominios:adicionar', dominio),
   removeDomain: (dominio) => call('dominios:remover', dominio),
   runCommand: (id) => call('script:comando', id),
+  onRenomearAba: (fn) => {
+    ipcRenderer.on('tab:renomear', (_e, id) => fn(id));
+  },
   onStateChanged: (fn) => {
     ipcRenderer.on('state:changed', (_e, state) => fn(state));
   },

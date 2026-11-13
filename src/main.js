@@ -417,6 +417,14 @@ function registerIpc() {
     aplicarTemaNasContas();
     broadcast();
   });
+  // Botão direito numa aba: menu nativo com Renomear (a barra troca o nome por um campo) e Fechar aba.
+  handle('tab:menu', (id) => {
+    if (!accountById(id) || !win || !uiView) return;
+    Menu.buildFromTemplate([
+      { label: 'Renomear', click: () => uiView && uiView.webContents.send('tab:renomear', id) },
+      { label: 'Fechar aba', click: () => closeTab(id) },
+    ]).popup({ window: win });
+  });
   handle('account:rename', (id, nome) => {
     const acc = accountById(id);
     if (!acc) throw new Error('conta não encontrada');

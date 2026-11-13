@@ -27,3 +27,15 @@ test('id de mensagem inválido é recusado antes de qualquer trabalho', async ()
   const servico = criarServicoTranscricao({ dataDir, appDir: dataDir });
   await assert.rejects(servico.transcrever({ id: '', bytes: Buffer.from('x'), ext: 'ogg' }), /mensagem inválida/);
 });
+
+test('vídeo: extensões de vídeo são aceitas e o limite é maior que o do áudio', async () => {
+  const { EXTENSOES, TAMANHO_MAX, TAMANHO_MAX_VIDEO } = require('../src/transcricao-servico');
+  for (const ext of ['mp4', 'webm', 'mov', '3gp', 'mkv']) assert.ok(EXTENSOES.has(ext), ext);
+  assert.ok(TAMANHO_MAX_VIDEO > TAMANHO_MAX);
+  const dataDir = pastaTemp('dm-servico-video-');
+  const servico = criarServicoTranscricao({ dataDir, appDir: dataDir });
+  // Áudio de 26 MB passa do limite do áudio; o mesmo tamanho como vídeo não é barrado pelo tamanho.
+  const grande = Buffer.alloc(26 * 1024 * 1024);
+  await assert.rejects(servico.transcrever({ id: 'a', bytes: grande, ext: 'ogg' }), /áudio grande demais/);
+  await assert.rejects(servico.transcrever({ id: 'v', bytes: grande, ext: 'mp4', video: true }), (e) => !/grande demais/.test(e.message));
+});

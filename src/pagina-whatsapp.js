@@ -43,12 +43,13 @@
     return m.Msg._models.find((x) => x.id && (x.id._serialized === id || x.id.id === id)) || null;
   }
 
-  async function obterAudio(id) {
+  // tipos: tipos de mensagem aceitos (áudio: ptt/audio; vídeo: video).
+  async function obterAudio(id, tipos = ['ptt', 'audio']) {
     const m = modulosWA();
     if (!m) throw new Error('o WhatsApp ainda está carregando; tente de novo');
     const msg = acharMensagem(m, id);
     if (!msg) throw new Error('mensagem não encontrada; role a conversa até ela e tente de novo');
-    if (msg.type !== 'ptt' && msg.type !== 'audio') throw new Error('esta mensagem não é um áudio');
+    if (!tipos.includes(msg.type)) throw new Error(tipos.includes('video') ? 'esta mensagem não é um vídeo' : 'esta mensagem não é um áudio');
 
     for (let tentativa = 0; tentativa < 20; tentativa++) {
       if (msg.filehash) {
@@ -60,10 +61,13 @@
       }
       await new Promise((r) => setTimeout(r, 700));
     }
-    throw new Error('o áudio ainda não foi baixado; toque nele uma vez e tente de novo');
+    throw new Error(tipos.includes('video') ? 'o vídeo ainda não foi baixado; toque nele uma vez e tente de novo' : 'o áudio ainda não foi baixado; toque nele uma vez e tente de novo');
   }
 
   function extensaoDe(tipo) {
+    if (/quicktime/.test(tipo)) return 'mov';
+    if (/3gpp/.test(tipo)) return '3gp';
+    if (/matroska/.test(tipo)) return 'mkv';
     if (/ogg/.test(tipo)) return 'ogg';
     if (/mp4|m4a|aac/.test(tipo)) return 'mp4';
     if (/webm/.test(tipo)) return 'webm';
@@ -73,7 +77,7 @@
 
   // Manda o áudio ao app pela ponte (src/preload-transcricao.js) e espera a resposta.
   // Cada trecho transcrito chega como 'dm-transcricao:parcial' (onParcial) e renova o prazo de 5 min sem resposta.
-  function pedirAoApp(id, buffer, ext, onParcial) {
+  function pedirAoApp(id, buffer, ext, onParcial, video = false) {
     return new Promise((resolve, reject) => {
       const reqId = crypto.randomUUID();
       const PRAZO = 5 * 60 * 1000;
@@ -100,7 +104,7 @@
       }
       prazo();
       window.addEventListener('message', ouvir);
-      window.postMessage({ canal: 'dm-transcricao:pedido', reqId, id, ext, buffer }, location.origin, [buffer]);
+      window.postMessage({ canal: 'dm-transcricao:pedido', reqId, id, ext, video, buffer }, location.origin, [buffer]);
     });
   }
 
@@ -143,16 +147,16 @@
     return /[.!?]$/.test(m) ? m : m + '.';
   }
 
-  async function transcrever(botao, area, id) {
+  async function transcrever(botao, area, id, video = false) {
     botao.disabled = true;
     botao.textContent = 'Transcrevendo…';
     try {
-      const blob = await obterAudio(id);
+      const blob = await obterAudio(id, video ? ['video'] : ['ptt', 'audio']);
       const buffer = await blob.arrayBuffer();
       // O texto vai aparecendo a cada trecho de 15 s; a resposta final troca pelo texto completo.
       const r = await pedirAoApp(id, buffer, extensaoDe(blob.type), (texto) => {
         if (texto) mostrar(area, texto);
-      });
+      }, video);
       if (!r.ok) throw new Error(r.erro);
       mostrar(area, r.texto || '(sem fala reconhecível)');
     } catch (err) {
@@ -173,16 +177,16 @@
     return null;
   }
 
-  function montarBotao(id, balao) {
+  function montarBotao(id, balao, video = false) {
     const barra = document.createElement('div');
     barra.className = 'dm-tr';
     const botao = document.createElement('button');
     botao.type = 'button';
-    botao.textContent = 'Transcrever';
+    botao.textContent = video ? 'Transcrever vídeo' : 'Transcrever';
     const area = document.createElement('div');
     botao.addEventListener('click', (e) => {
       e.stopPropagation();
-      transcrever(botao, area, id);
+      transcrever(botao, area, id, video);
     });
     barra.appendChild(botao);
     barra.appendChild(area);
@@ -211,11 +215,29 @@
     }
   }
 
+  // Vídeos: acha as mensagens de vídeo pelo tipo (módulos internos) e põe o botão no balão.
+  function varrerVideos() {
+    const m = modulosWA();
+    if (!m) return;
+    for (const linha of document.querySelectorAll('[data-id]')) {
+      const meta = linha.querySelector('[data-testid="msg-meta"]');
+      if (!meta || linha.querySelector('.dm-tr')) continue;
+      const id = linha.getAttribute('data-id');
+      const msg = acharMensagem(m, id);
+      if (!msg || msg.type !== 'video') continue;
+      let balao = meta.parentElement;
+      while (balao && balao !== linha && !balao.querySelector('img, canvas, video')) balao = balao.parentElement;
+      if (!balao || balao === linha) balao = meta.parentElement;
+      if (balao) montarBotao(id, balao, true);
+    }
+  }
+
   let agendado = null;
   const observer = new MutationObserver(() => {
     clearTimeout(agendado);
-    agendado = setTimeout(varrer, 400);
+    agendado = setTimeout(() => { varrer(); varrerVideos(); }, 400);
   });
   observer.observe(document.body, { childList: true, subtree: true });
   varrer();
+  varrerVideos();
 })();
