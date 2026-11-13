@@ -20,6 +20,14 @@ if (SITES_TRANSCRICAO.includes(location.hostname)) {
     window.postMessage({ canal: 'dm-transcricao:parcial', reqId: d.reqId, texto: d.texto }, location.origin);
   });
 
+  // Opções (transcrição automática e de vídeos): a página pede ao carregar e recebe de novo a cada mudança.
+  const enviarOpcoes = (o) => window.postMessage({ canal: 'dm-transcricao:opcoes', ...o }, location.origin);
+  ipcRenderer.on('transcricao:opcoes', (_e, o) => enviarOpcoes(o));
+  window.addEventListener('message', async (e) => {
+    if (e.source !== window || e.origin !== location.origin) return;
+    if (e.data && e.data.canal === 'dm-transcricao:opcoes-pedir') enviarOpcoes(await ipcRenderer.invoke('transcricao:opcoes'));
+  });
+
   window.addEventListener('message', async (e) => {
     if (e.source !== window || e.origin !== location.origin) return;
     const d = e.data;

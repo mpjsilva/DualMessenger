@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('dm', {
   menuAba: (id) => call('tab:menu', id),
   renameAccount: (id, nome) => call('account:rename', id, nome),
   setTheme: (tema) => call('tema:set', tema),
+  setTranscricaoOpcao: (chave, valor) => call('transcricao:opcao', chave, valor),
   prepararTranscricao: () => call('transcricao:instalar'),
   importScript: () => call('script:import'),
   toggleScript: (id, enabled) => call('script:toggle', id, enabled),

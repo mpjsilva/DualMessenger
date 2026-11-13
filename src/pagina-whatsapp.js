@@ -25,6 +25,19 @@
   `;
   document.head.appendChild(estilo);
 
+  // Opções do app (Opções › Transcrição), recebidas pela ponte. auto: transcreve sozinho as mensagens novas.
+  let opcoes = { auto: false, videos: true };
+  const inicioEm = Date.now();
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (e.source !== window || !d || d.canal !== 'dm-transcricao:opcoes') return;
+    opcoes = { auto: d.auto === true, videos: d.videos !== false };
+    if (!opcoes.videos) for (const b of document.querySelectorAll('.dm-tr-video')) b.remove();
+    else varrerVideos();
+    if (opcoes.auto) varrer();
+  });
+  window.postMessage({ canal: 'dm-transcricao:opcoes-pedir' }, location.origin);
+
   // Módulos internos do WhatsApp. Podem não existir logo no início: tenta de novo quando precisa.
   function modulosWA() {
     try {
@@ -177,9 +190,10 @@
     return null;
   }
 
-  function montarBotao(id, balao, video = false) {
+  function montarBotao(id, balao, video = false, nova = false) {
     const barra = document.createElement('div');
-    barra.className = 'dm-tr';
+    barra.className = 'dm-tr' + (video ? ' dm-tr-video' : '');
+    if (nova) barra.dataset.dmNova = '1';
     const botao = document.createElement('button');
     botao.type = 'button';
     botao.textContent = video ? 'Transcrever vídeo' : 'Transcrever';
@@ -207,18 +221,32 @@
       const balao = acharBalao(t);
       if (!balao || balao.querySelector('.dm-tr')) continue;
       const id = linha.getAttribute('data-id');
+      let nova = false;
       if (m) {
         const msg = acharMensagem(m, id);
         if (msg && msg.type !== 'ptt' && msg.type !== 'audio') continue; // vídeo etc.
+        // Nova = chegou depois que o app abriu (margem de 60 s para diferença de relógio).
+        nova = !!(msg && msg.t && msg.t * 1000 >= inicioEm - 60000);
       }
-      montarBotao(id, balao);
+      montarBotao(id, balao, false, nova);
+    }
+    autoTranscrever();
+  }
+
+  // Transcrição automática: aperta o botão das mensagens de voz novas, uma vez por mensagem.
+  function autoTranscrever() {
+    if (!opcoes.auto) return;
+    for (const barra of document.querySelectorAll('.dm-tr[data-dm-nova="1"]:not(.dm-tr-video):not([data-dm-auto])')) {
+      const botao = barra.querySelector('button');
+      barra.dataset.dmAuto = '1';
+      if (botao && !botao.disabled) botao.click();
     }
   }
 
   // Vídeos: acha as mensagens de vídeo pelo tipo (módulos internos) e põe o botão no balão.
   function varrerVideos() {
     const m = modulosWA();
-    if (!m) return;
+    if (!m || !opcoes.videos) return;
     for (const linha of document.querySelectorAll('[data-id]')) {
       const meta = linha.querySelector('[data-testid="msg-meta"]');
       if (!meta || linha.querySelector('.dm-tr')) continue;

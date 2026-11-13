@@ -116,6 +116,7 @@ function snapshot() {
     panelOpen,
     tema: state.tema,
     versao: app.getVersion(),
+    opcoesTranscricao: opcoesTranscricao(),
     transcricao: instalador ? { ...instalador.estado(), ...instalacao } : null,
     listaFrente,
     services: Object.entries(SERVICES).map(([key, s]) => ({ key, label: s.label })),
@@ -479,6 +480,18 @@ function registerIpc() {
     return shell.openExternal(url);
   });
   // Botão "Preparar" em Opções › Transcrição. Roda em segundo plano; o progresso vai pelo snapshot.
+  // Opções › Transcrição: liga/desliga a transcrição automática e a de vídeos. Vale já nas abas abertas.
+  ipcMain.handle('transcricao:opcoes', () => opcoesTranscricao());
+  handle('transcricao:opcao', (chave, valor) => {
+    const campo = { auto: 'transcricaoAuto', videos: 'transcricaoVideos' }[chave];
+    if (!campo) throw new Error('opção desconhecida');
+    prefs[campo] = valor === true;
+    salvarPrefs();
+    for (const t of tabs.values()) {
+      try { t.view.webContents.send('transcricao:opcoes', opcoesTranscricao()); } catch { /* aba fechando */ }
+    }
+    broadcast();
+  });
   handle('transcricao:instalar', () => {
     if (instalacao.rodando) throw new Error('a preparação já está em andamento');
     instalacao = { rodando: true, etapa: '', texto: 'Preparando…', pct: null, erro: null };
@@ -500,6 +513,7 @@ function registerIpc() {
     if (!ORIGENS_TRANSCRICAO.some((o) => origem.startsWith(o))) {
       return { ok: false, erro: 'origem não permitida' };
     }
+    if (pedido && pedido.video === true && !prefs.transcricaoVideos) return { ok: false, erro: 'a transcrição de vídeos está desligada em Opções › Transcrição' };
     // Texto parcial: a cada trecho de 15 s pronto, o app manda o texto até ali para a mesma página (só para exibir).
     const reqId = pedido && typeof pedido.reqId === 'string' && pedido.reqId.length <= 100 ? pedido.reqId : null;
     const frame = event.senderFrame;
@@ -571,7 +585,11 @@ function integrarAoSistema() {
 let saindo = false;
 let tray = null;
 const arquivoPrefs = () => path.join(app.getPath('userData'), 'preferencias.json');
-const prefs = { fecharParaBandeja: true };
+const prefs = { fecharParaBandeja: true, transcricaoAuto: false, transcricaoVideos: true };
+const opcoesTranscricao = () => ({ auto: prefs.transcricaoAuto, videos: prefs.transcricaoVideos });
+function salvarPrefs() {
+  try { writeJsonAtomic(arquivoPrefs(), prefs); } catch (err) { console.warn('prefs:', err.message); }
+}
 
 function mostrarJanela() {
   if (!win) createWindow();
@@ -581,7 +599,6 @@ function mostrarJanela() {
 
 function montarBandeja() {
   if (tray || process.env.DM_SHOT) return;
-  Object.assign(prefs, readJson(arquivoPrefs(), {}));
   try {
     tray = new Tray(iconeDoApp());
   } catch (err) {
@@ -597,7 +614,7 @@ function montarBandeja() {
       checked: prefs.fecharParaBandeja,
       click: (item) => {
         prefs.fecharParaBandeja = item.checked;
-        try { writeJsonAtomic(arquivoPrefs(), prefs); } catch (err) { console.warn('prefs:', err.message); }
+        salvarPrefs();
       },
     },
     { type: 'separator' },
@@ -671,6 +688,7 @@ app.whenReady().then(async () => {
   // Pop-ups temporários da sessão anterior não devem voltar.
   state.accounts = state.accounts.filter((a) => !a.transient);
 
+  Object.assign(prefs, readJson(arquivoPrefs(), {}));
   registerIpc();
   createWindow();
   montarBandeja();

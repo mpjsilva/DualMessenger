@@ -522,6 +522,11 @@ function renderContas() {
 
 // Opções › Transcrição: mostra o estado e o progresso da preparação (vem do processo principal).
 function renderTranscricao() {
+  const o = estado.opcoesTranscricao;
+  if (o) {
+    $('opt-auto').checked = o.auto;
+    $('opt-videos').checked = o.videos;
+  }
   const t = estado.transcricao;
   if (!t) return;
   const titulo = $('tr-titulo');
@@ -652,6 +657,8 @@ function init() {
     b.addEventListener('click', () => chamar(window.dm.setTheme(b.dataset.tema)));
   }
 
+  $('opt-auto').addEventListener('change', (e) => chamar(window.dm.setTranscricaoOpcao('auto', e.target.checked)));
+  $('opt-videos').addEventListener('change', (e) => chamar(window.dm.setTranscricaoOpcao('videos', e.target.checked)));
   $('btn-tr').addEventListener('click', () => chamar(window.dm.prepararTranscricao()));
 
   window.dm.onStateChanged(render);

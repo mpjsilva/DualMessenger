@@ -25,6 +25,20 @@
   `;
   document.head.appendChild(estilo);
 
+  // Opções do app (Opções › Transcrição), recebidas pela ponte. auto: transcreve sozinho as mensagens novas.
+  let opcoes = { auto: false, videos: true };
+  let ultimaTroca = Date.now(); // abertura do app ou troca de conversa
+  window.addEventListener('hashchange', () => { ultimaTroca = Date.now(); });
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (e.source !== window || !d || d.canal !== 'dm-transcricao:opcoes') return;
+    opcoes = { auto: d.auto === true, videos: d.videos !== false };
+    if (!opcoes.videos) for (const b of document.querySelectorAll('.dm-tr-video')) b.remove();
+    else varrerVideos();
+    if (opcoes.auto) varrer();
+  });
+  window.postMessage({ canal: 'dm-transcricao:opcoes-pedir' }, location.origin);
+
   // Áudio por mensagem: chave (conversa + id) -> Promise<Blob>, preenchido quando o player recebe o arquivo.
   // A conversa entra na chave porque o id da mensagem pode se repetir entre chats.
   const audios = new Map();
@@ -324,7 +338,7 @@
 
   function montarBotaoVideo(linha, referencia) {
     const barra = document.createElement('div');
-    barra.className = 'dm-tr';
+    barra.className = 'dm-tr dm-tr-video';
     const botao = document.createElement('button');
     botao.type = 'button';
     botao.textContent = 'Transcrever vídeo';
@@ -339,6 +353,7 @@
   }
 
   function varrerVideos() {
+    if (!opcoes.videos) return;
     for (const midia of document.querySelectorAll('.Video')) {
       const linha = midia.closest('[data-message-id]');
       if (!linha || linha.querySelector('.dm-tr')) continue;
@@ -348,9 +363,10 @@
     }
   }
 
-  function montarBotao(id, audio) {
+  function montarBotao(id, audio, nova = false) {
     const barra = document.createElement('div');
     barra.className = 'dm-tr';
+    if (nova) barra.dataset.dmNova = '1';
     const botao = document.createElement('button');
     botao.type = 'button';
     botao.textContent = 'Transcrever';
@@ -372,7 +388,21 @@
       if (!linha) continue;
       const proximo = audio.nextElementSibling;
       if (proximo && proximo.classList.contains('dm-tr')) continue;
-      montarBotao(linha.dataset.messageId, audio);
+      // Nova = uma das 3 últimas mensagens, e a conversa já estava aberta há mais de 4 s (histórico não conta).
+      const linhas = [...document.querySelectorAll('[data-message-id]')];
+      const nova = Date.now() - ultimaTroca > 4000 && linhas.indexOf(linha) >= linhas.length - 3;
+      montarBotao(linha.dataset.messageId, audio, nova);
+    }
+    autoTranscrever();
+  }
+
+  // Transcrição automática: aperta o botão das mensagens de voz novas, uma vez por mensagem.
+  function autoTranscrever() {
+    if (!opcoes.auto) return;
+    for (const barra of document.querySelectorAll('.dm-tr[data-dm-nova="1"]:not(.dm-tr-video):not([data-dm-auto])')) {
+      const botao = barra.querySelector('button');
+      barra.dataset.dmAuto = '1';
+      if (botao && !botao.disabled) botao.click();
     }
   }
 
