@@ -7,13 +7,11 @@ const os = require('node:os');
 const path = require('node:path');
 const { resolverConfigTranscricao, MODELO_PADRAO } = require('../src/transcricao-config');
 const { buildFfmpegArgs, buildWhisperArgs, parseWhisperJson } = require('../src/transcricao');
+const { pastaTemp } = require('./ajuda');
 
-function pastaTemp() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'dm-cfg-'));
-}
 
 test('sem transcricao.json: usa o ffmpeg do projeto e o whisper-cli do PATH', () => {
-  const dados = pastaTemp();
+  const dados = pastaTemp('cfg-');
   const app = '/app';
   const cfg = resolverConfigTranscricao({ dataDir: dados, appDir: app, existe: (p) => p === path.join(app, 'vendor', 'bin', 'ffmpeg') });
   assert.equal(cfg.ffmpeg, path.join(app, 'vendor', 'bin', 'ffmpeg'));
@@ -24,12 +22,12 @@ test('sem transcricao.json: usa o ffmpeg do projeto e o whisper-cli do PATH', ()
 });
 
 test('sem ffmpeg no projeto: cai para o ffmpeg do PATH', () => {
-  const cfg = resolverConfigTranscricao({ dataDir: pastaTemp(), appDir: '/app', existe: () => false });
+  const cfg = resolverConfigTranscricao({ dataDir: pastaTemp('cfg-'), appDir: '/app', existe: () => false });
   assert.equal(cfg.ffmpeg, 'ffmpeg');
 });
 
 test('transcricao.json na pasta de dados tem prioridade', () => {
-  const dados = pastaTemp();
+  const dados = pastaTemp('cfg-');
   fs.writeFileSync(path.join(dados, 'transcricao.json'), JSON.stringify({
     whisper: '/opt/whisper/whisper-cli',
     model: '/opt/modelos/ggml-small.bin',

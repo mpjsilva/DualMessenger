@@ -7,9 +7,10 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const { ScriptManager } = require('../src/motor');
+const { pastaTemp } = require('./ajuda');
 
 function novoMotor() {
-  return new ScriptManager({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'dm-gm-')) });
+  return new ScriptManager({ dataDir: pastaTemp('dm-gm-') });
 }
 
 function script(nome, grants) {

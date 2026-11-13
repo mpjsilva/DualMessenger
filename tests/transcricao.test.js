@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { buildFfmpegArgs, buildWhisperArgs, parseWhisperJson, cabecalhoWav, dividirWav, transcreverArquivo } = require('../src/transcricao');
+const { pastaTemp } = require('./ajuda');
 
 // WAV de teste: 16 kHz, mono, 16 bits, com `segundos` de silêncio.
 const wavDeTeste = (segundos) => cabecalhoWav(Buffer.alloc(Math.round(segundos * 32000)));
@@ -73,7 +74,7 @@ test('dividirWav devolve null para formato diferente de 16 kHz mono 16 bits', ()
 
 // whisper-cli falso: grava um JSON com o nome do arquivo recebido (-f), para conferir a ordem dos trechos.
 function preparar40s() {
-  const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-teste-trechos-'));
+  const pasta = pastaTemp('dm-teste-trechos-');
   const falso = path.join(pasta, 'whisper-falso');
   fs.writeFileSync(falso, `#!${process.execPath}
 const fs = require('node:fs');

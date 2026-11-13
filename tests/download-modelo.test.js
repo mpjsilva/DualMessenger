@@ -7,6 +7,7 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const { baixarModelo } = require('../src/transcricao-instalar');
+const { pastaTemp } = require('./ajuda');
 
 // Servidor local que anuncia o tamanho certo (como o Hugging Face faz).
 function servidor(tamanho) {
@@ -22,7 +23,7 @@ function servidor(tamanho) {
 
 test('download completo é aceito e recebe o nome final', async () => {
   const { s, url } = await servidor(3 * 1024 * 1024);
-  const destino = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dm-dl-')), 'ggml-small.bin');
+  const destino = path.join(pastaTemp('dm-dl-'), 'ggml-small.bin');
   try {
     await baixarModelo(destino, () => {}, url);
     assert.equal(fs.statSync(destino).size, 3 * 1024 * 1024);
@@ -40,7 +41,7 @@ test('download com tamanho menor que o anunciado é recusado', async () => {
     setTimeout(() => res.destroy(), 20);
   });
   await new Promise((r) => s.listen(0, '127.0.0.1', r));
-  const destino = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dm-dl-')), 'ggml-small.bin');
+  const destino = path.join(pastaTemp('dm-dl-'), 'ggml-small.bin');
   try {
     await assert.rejects(baixarModelo(destino, () => {}, `http://127.0.0.1:${s.address().port}/x`));
     assert.equal(fs.existsSync(destino), false);

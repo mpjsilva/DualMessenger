@@ -140,8 +140,9 @@ npm start
 npm install
 npm start          # abre o app
 npm test           # testes unitários
-npm run dist       # gera o AppImage em dist/ (Linux)
-npm run dist:win    # gera o instalador do Windows em dist/win/ (usa o container electronuserland/builder:wine)
+npm run dist              # AppImage, .deb e .rpm em dist/<versão>/ (o .rpm precisa do rpmbuild)
+npm run dist:win:docker   # instalador do Windows em dist/<versão>/ (container electronuserland/builder:wine)
+npm run sha256            # gera o .sha256 de cada pacote
 ```
 
 Diagnóstico: `DM_DEVTOOLS=1 npm start` abre o DevTools de cada conta, para inspecionar o HTML das mensagens.

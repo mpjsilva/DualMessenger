@@ -8,10 +8,8 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const { caminhos, baixarVerificado, criarInstalador, FONTES_WINDOWS } = require('../src/transcricao-instalar');
+const { pastaTemp } = require('./ajuda');
 
-function pastaTemp(nome) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `dm-${nome}-`));
-}
 
 test('no Windows, o whisper-cli.exe e o ffmpeg.exe ficam em ferramentas/', () => {
   const c = caminhos('C:\\dados', 'C:\\app', 'win32');
@@ -26,7 +24,7 @@ test('no Linux, os caminhos continuam os de antes (whisper compilado e ffmpeg do
 });
 
 test('no Windows não há pacotes do sistema para instalar', () => {
-  const inst = criarInstalador({ dataDir: pastaTemp('win'), appDir: '/app', plataforma: 'win32' });
+  const inst = criarInstalador({ dataDir: pastaTemp('dm-win-'), appDir: '/app', plataforma: 'win32' });
   assert.deepEqual(inst.ferramentasFaltando(), []);
 });
 
@@ -43,7 +41,7 @@ test('baixarVerificado aceita o arquivo quando o SHA-256 confere', async () => {
   const servidor = http.createServer((req, res) => res.end(conteudo));
   await new Promise((r) => servidor.listen(0, '127.0.0.1', r));
   try {
-    const destino = path.join(pastaTemp('ok'), 'ferramenta.zip');
+    const destino = path.join(pastaTemp('dm-ok-'), 'ferramenta.zip');
     await baixarVerificado(`http://127.0.0.1:${servidor.address().port}/x.zip`, destino, hash);
     assert.deepEqual(fs.readFileSync(destino), conteudo);
     assert.equal(fs.existsSync(`${destino}.parcial`), false);
@@ -56,7 +54,7 @@ test('baixarVerificado recusa hash diferente e não deixa arquivo para trás', a
   const servidor = http.createServer((req, res) => res.end('conteúdo adulterado'));
   await new Promise((r) => servidor.listen(0, '127.0.0.1', r));
   try {
-    const destino = path.join(pastaTemp('ruim'), 'ferramenta.zip');
+    const destino = path.join(pastaTemp('dm-ruim-'), 'ferramenta.zip');
     await assert.rejects(
       baixarVerificado(`http://127.0.0.1:${servidor.address().port}/x.zip`, destino, '0'.repeat(64)),
       /não confere \(SHA-256 diferente\)/,
@@ -70,7 +68,7 @@ test('baixarVerificado recusa hash diferente e não deixa arquivo para trás', a
 
 test('vcRuntimeInstalado só vale quando as três DLLs do Visual C++ estão em System32', () => {
   const { vcRuntimeInstalado } = require('../src/transcricao-instalar');
-  const sistema = pastaTemp('sistema');
+  const sistema = pastaTemp('dm-sistema-');
   assert.equal(vcRuntimeInstalado(sistema), false);
   const sys32 = path.join(sistema, 'System32');
   fs.mkdirSync(sys32, { recursive: true });

@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { ScriptManager } = require('../src/motor');
+const { pastaTemp } = require('./ajuda');
 
 const TEXTO = `// ==UserScript==
 // @name         Marca de teste
@@ -25,7 +26,7 @@ function fail(msg) {
 
 app.whenReady().then(async () => {
   try {
-    const dados = process.env.DM_DATA_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'dm-motor-smoke-'));
+    const dados = process.env.DM_DATA_DIR || pastaTemp('dm-motor-smoke-');
     const motor = new ScriptManager({ dataDir: dados });
     if (!motor.list().some((s) => s.name === 'Marca de teste')) motor.add(TEXTO);
 

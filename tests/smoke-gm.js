@@ -11,6 +11,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { ScriptManager } = require('../src/motor');
 const { registerGmIpc } = require('../src/gm-ipc');
+const { pastaTemp } = require('./ajuda');
 
 function fail(msg) {
   console.error('FALHOU:', msg);
@@ -28,7 +29,7 @@ app.whenReady().then(async () => {
     const porta = servidor.address().port;
     const base = `http://127.0.0.1:${porta}`;
 
-    const motor = new ScriptManager({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'dm-gm-smoke-')) });
+    const motor = new ScriptManager({ dataDir: pastaTemp('dm-gm-smoke-') });
     motor.add(`// ==UserScript==
 // @name GM teste
 // @match ${base}/*

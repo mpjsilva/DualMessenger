@@ -6,11 +6,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { criarInstalador, caminhos } = require('../src/transcricao-instalar');
+const { pastaTemp } = require('./ajuda');
 
 function pastas() {
   return {
-    dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'dm-inst-dados-')),
-    appDir: fs.mkdtempSync(path.join(os.tmpdir(), 'dm-inst-app-')),
+    dataDir: pastaTemp('dm-inst-dados-'),
+    appDir: pastaTemp('dm-inst-app-'),
   };
 }
 

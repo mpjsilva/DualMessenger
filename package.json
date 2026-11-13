@@ -1,7 +1,7 @@
 {
   "name": "dual-messenger-app",
   "productName": "Dual Messenger",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Vários WhatsApp Web e Telegram Web em abas isoladas, com transcrição local de mensagens de voz e userscripts.",
   "main": "src/main.js",
   "author": "mpjsilva",
@@ -14,18 +14,26 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test tests/*.test.js",
-    "dist": "electron-builder --linux AppImage",
-    "dist:win": "electron-builder --win nsis --x64 --config.directories.output=dist/win"
+    "dist": "electron-builder --linux AppImage deb rpm --publish never",
+    "dist:win": "electron-builder --win nsis --x64 --publish never",
+    "dist:win:docker": "docker run --rm -e ELECTRON_CACHE=/work/.cache/electron -e ELECTRON_BUILDER_CACHE=/work/.cache/electron-builder -v \"$PWD\":/work -w /work electronuserland/builder:wine bash -c \"npx electron-builder --win nsis --x64 --publish never; chown -R $(id -u):$(id -g) /work/dist /work/.cache; rm -rf /work/.cache\"",
+    "postdist": "node scripts/limpar-dist.js",
+    "postdist:win": "node scripts/limpar-dist.js",
+    "postdist:win:docker": "node scripts/limpar-dist.js",
+    "sha256": "node scripts/sha256.js"
   },
   "build": {
     "appId": "local.dualmessenger.app",
     "artifactName": "DualMessenger-${version}.${ext}",
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb",
+        "rpm"
       ],
       "category": "Network;InstantMessaging",
-      "icon": "assets/icone.png"
+      "icon": "assets/icone.png",
+      "maintainer": "mpjsilva <56980262+mpjsilva@users.noreply.github.com>"
     },
     "files": [
       "src/**/*",
@@ -52,6 +60,9 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "shortcutName": "Dual Messenger"
+    },
+    "directories": {
+      "output": "dist/${version}"
     }
   },
   "devDependencies": {

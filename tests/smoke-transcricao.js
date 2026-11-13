@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { criarServicoTranscricao } = require('../src/transcricao-servico');
+const { pastaTemp } = require('./ajuda');
 
 async function main() {
   const { WHISPER_BIN, MODELO, AUDIO } = process.env;
@@ -15,7 +16,7 @@ async function main() {
     console.error('Defina WHISPER_BIN, MODELO e AUDIO (veja o comentário no topo do arquivo).');
     process.exit(2);
   }
-  const dados = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-smoke-tr-'));
+  const dados = pastaTemp('dm-smoke-tr-');
   fs.writeFileSync(path.join(dados, 'transcricao.json'), JSON.stringify({ whisper: WHISPER_BIN, model: MODELO }));
 
   const servico = criarServicoTranscricao({ dataDir: dados, appDir: path.join(__dirname, '..') });

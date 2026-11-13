@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 const { ScriptManager, envolver } = require('../src/motor');
+const { pastaTemp } = require('./ajuda');
 
 const SCRIPT = (nome, match, extra = '') => `// ==UserScript==
 // @name ${nome}
@@ -33,7 +34,7 @@ function fakeWc(url) {
 }
 
 test('add valida o cabeçalho e guarda uma cópia', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-motor-'));
+  const dir = pastaTemp('dm-motor-');
   const m = new ScriptManager({ dataDir: dir });
   const id = m.add(SCRIPT('Um', 'https://web.whatsapp.com/*'));
   assert.equal(m.list()[0].name, 'Um');
@@ -43,7 +44,7 @@ test('add valida o cabeçalho e guarda uma cópia', () => {
 });
 
 test('injetar roda só os scripts que combinam com a URL e habilitados', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-motor-'));
+  const dir = pastaTemp('dm-motor-');
   const m = new ScriptManager({ dataDir: dir });
   m.add(SCRIPT('WA', 'https://web.whatsapp.com/*'));
   m.add(SCRIPT('TG', '*://*.telegram.org/*'));
@@ -57,7 +58,7 @@ test('injetar roda só os scripts que combinam com a URL e habilitados', async (
 });
 
 test('erro em um script não impede os outros', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-motor-'));
+  const dir = pastaTemp('dm-motor-');
   const m = new ScriptManager({ dataDir: dir });
   m.add(SCRIPT('Quebrado', 'https://web.whatsapp.com/*').replace('window.__marcas', 'naoExiste.x'));
   m.add(SCRIPT('Bom', 'https://web.whatsapp.com/*'));
@@ -75,7 +76,7 @@ test('envolver isola o script com try/catch', () => {
 });
 
 test('remove apaga o arquivo do script', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-motor-'));
+  const dir = pastaTemp('dm-motor-');
   const m = new ScriptManager({ dataDir: dir });
   const id = m.add(SCRIPT('Apagar', 'https://web.whatsapp.com/*'));
   const arquivo = path.join(dir, 'userscripts', `${id}.user.js`);

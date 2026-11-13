@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { integrarSistema, escaparArgumento, ID_APP } = require('../src/sistema-linux');
 const { ARQUIVO_ICONE } = require('../src/recursos');
+const { pastaTemp } = require('./ajuda');
 
 // Lê um argumento do Exec como o lançador: primeiro tira o escape do arquivo, depois o das aspas.
 function lerArgumento(campo) {
@@ -16,7 +17,7 @@ function lerArgumento(campo) {
 }
 
 function casa() {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-sistema-home-'));
+  const home = pastaTemp('dm-sistema-home-');
   return { home, dataHome: path.join(home, '.local', 'share') };
 }
 
