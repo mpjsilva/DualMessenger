@@ -13,8 +13,10 @@ const SEGUNDOS_POR_TRECHO = 15;
 const TAXA = 16000;          // Hz
 const BYTES_POR_SEGUNDO = TAXA * 2; // 16 bits mono
 
-function buildFfmpegArgs(input, output) {
-  return ['-y', '-loglevel', 'error', '-i', input, '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', output];
+// limite: só os primeiros N segundos (prévia de vídeo).
+function buildFfmpegArgs(input, output, limite = null) {
+  const corte = limite ? ['-t', String(limite)] : [];
+  return ['-y', '-loglevel', 'error', '-i', input, '-vn', ...corte, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', output];
 }
 
 function buildWhisperArgs({ model, wav, outPrefix, language = 'pt', threads = 4 }) {
@@ -134,7 +136,7 @@ async function transcreverArquivo(inputPath, config, opcoes = {}) {
     if (ehWav) fs.copyFileSync(inputPath, wav);
     else {
       try {
-        await run(config.ffmpeg, buildFfmpegArgs(inputPath, wav));
+        await run(config.ffmpeg, buildFfmpegArgs(inputPath, wav, opcoes.limiteSegundos));
       } catch (err) {
         // Vídeo sem faixa de áudio (ex.: GIF do WhatsApp): o ffmpeg não gera o WAV.
         if (/does not contain any stream|matches no streams|Output file #0 does not contain/i.test(err.message)) throw new Error('este vídeo não tem áudio');

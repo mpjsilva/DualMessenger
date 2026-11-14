@@ -14,20 +14,21 @@ const { readJson, writeJsonAtomic } = require('./store');
 const EXTENSOES_VIDEO = new Set(['mov', '3gp', 'mkv', 'avi']);
 const EXTENSOES = new Set(['ogg', 'opus', 'mp4', 'm4a', 'webm', 'mp3', 'wav', ...EXTENSOES_VIDEO]);
 const TAMANHO_MAX = 25 * 1024 * 1024;          // áudio
+const PREVIA_VIDEO_SEGUNDOS = 60;              // vídeo: só o 1º minuto é transcrito (prévia)
 const TAMANHO_MAX_VIDEO = 200 * 1024 * 1024;   // vídeo (o ffmpeg extrai só o áudio)
 
 function criarServicoTranscricao({ dataDir, appDir }) {
   const cachePath = path.join(dataDir, 'transcricoes.json');
   let fila = Promise.resolve(); // uma transcrição por vez: o whisper usa a CPU inteira
 
-  async function executar({ bytes, ext, onParcial }) {
+  async function executar({ bytes, ext, onParcial, limiteSegundos }) {
     // Pasta temporária só para esta transcrição: o áudio é gravado aqui e apagado no fim (finally).
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-transcrever-'));
     try {
       const entrada = path.join(tmp, `audio.${ext}`);
       fs.writeFileSync(entrada, Buffer.from(bytes));
       const config = resolverConfigTranscricao({ dataDir, appDir });
-      const r = await transcreverArquivo(entrada, config, { onParcial });
+      const r = await transcreverArquivo(entrada, config, { onParcial, limiteSegundos });
       return { texto: r.texto, idioma: r.idioma };
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
@@ -44,11 +45,11 @@ function criarServicoTranscricao({ dataDir, appDir }) {
     if (ehVideo && bytes.byteLength > TAMANHO_MAX_VIDEO) throw new Error('vídeo grande demais (limite de 200 MB)');
 
     // A chave é o conteúdo do áudio, não o id: o id de uma mensagem do Telegram só é único dentro da conversa.
-    const chave = createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+    const chave = createHash('sha256').update(Buffer.from(bytes)).digest('hex') + (ehVideo ? ':previa60' : '');
     const salvo = readJson(cachePath, {});
     if (salvo[chave]) return { ...salvo[chave], emCache: true };
 
-    const tarefa = fila.then(() => executar({ bytes, ext, onParcial: opcoes.onParcial }));
+    const tarefa = fila.then(() => executar({ bytes, ext, onParcial: opcoes.onParcial, limiteSegundos: ehVideo ? PREVIA_VIDEO_SEGUNDOS : null }));
     fila = tarefa.catch(() => {});
     const resultado = await tarefa;
 

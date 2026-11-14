@@ -25,6 +25,61 @@
   `;
   document.head.appendChild(estilo);
 
+
+  // Prévia do vídeo em popup (não cobre o vídeo). Fecha no X, fora do cartão ou com Esc.
+  const estiloPopup = document.createElement('style');
+  estiloPopup.textContent = `
+    .dm-pop { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, .55); font: 14px -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+    .dm-pop-cartao { box-sizing: border-box; width: min(520px, calc(100vw - 32px)); max-height: 70vh; display: flex; flex-direction: column;
+      background: #202c33; color: #e9edef; border-radius: 16px; box-shadow: 0 12px 40px rgba(0, 0, 0, .5); overflow: hidden; }
+    .dm-pop-topo { display: flex; align-items: center; gap: 8px; padding: 14px 16px 8px; }
+    .dm-pop-titulo { flex: 1; font-weight: 600; font-size: 15px; }
+    .dm-pop-x { border: none; background: transparent; color: inherit; font-size: 20px; line-height: 1; cursor: pointer; opacity: .7; padding: 2px 6px; }
+    .dm-pop-nota { padding: 0 16px 8px; font-size: 12px; opacity: .6; }
+    .dm-pop-corpo { padding: 4px 16px 16px; overflow: auto; white-space: pre-wrap; line-height: 1.5; overflow-wrap: anywhere; user-select: text; }
+    .dm-pop-erro { color: #ff453a; }
+  `;
+  document.head.appendChild(estiloPopup);
+
+  const PREVIA_SEGUNDOS = 60;
+
+  function abrirPopupVideo() {
+    document.querySelectorAll('.dm-pop').forEach((p) => p.remove());
+    const fundo = document.createElement('div');
+    fundo.className = 'dm-pop';
+    const cartao = document.createElement('div');
+    cartao.className = 'dm-pop-cartao';
+    const topo = document.createElement('div');
+    topo.className = 'dm-pop-topo';
+    const titulo = document.createElement('div');
+    titulo.className = 'dm-pop-titulo';
+    titulo.textContent = 'Prévia da transcrição do vídeo';
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'dm-pop-x';
+    x.textContent = '×';
+    x.setAttribute('aria-label', 'Fechar');
+    topo.append(titulo, x);
+    const nota = document.createElement('div');
+    nota.className = 'dm-pop-nota';
+    nota.textContent = `Só o primeiro minuto do vídeo é transcrito (${PREVIA_SEGUNDOS} s).`;
+    const corpo = document.createElement('div');
+    corpo.className = 'dm-pop-corpo';
+    cartao.append(topo, nota, corpo);
+    fundo.appendChild(cartao);
+    const fechar = () => { fundo.remove(); document.removeEventListener('keydown', tecla, true); };
+    const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); fechar(); } };
+    x.addEventListener('click', fechar);
+    fundo.addEventListener('click', (e) => { if (e.target === fundo) fechar(); });
+    document.addEventListener('keydown', tecla, true);
+    document.body.appendChild(fundo);
+    return {
+      texto(t) { corpo.className = 'dm-pop-corpo'; corpo.textContent = t; },
+      erro(t) { corpo.className = 'dm-pop-corpo dm-pop-erro'; corpo.textContent = t; },
+    };
+  }
+
   // Opções do app (Opções › Transcrição), recebidas pela ponte. auto: transcreve sozinho as mensagens novas.
   let opcoes = { auto: false, videos: true };
   const inicioEm = Date.now();
@@ -217,6 +272,32 @@
     return null;
   }
 
+  // Vídeo: a prévia (1º minuto) aparece num popup; depois o botão reabre a prévia.
+  async function transcreverVideo(botao, id) {
+    botao.disabled = true;
+    botao.textContent = 'Transcrevendo…';
+    const pop = abrirPopupVideo();
+    pop.texto('Preparando o vídeo…');
+    let final = null;
+    try {
+      const blob = await obterAudio(id, ['video']);
+      pop.texto('Transcrevendo…');
+      const r = await pedirAoApp(id, await blob.arrayBuffer(), extensaoDe(blob.type), (texto) => {
+        if (texto) pop.texto(texto);
+      }, true);
+      if (!r.ok) throw new Error(r.erro);
+      final = r.texto || '(sem fala reconhecível)';
+      pop.texto(final);
+      botao.textContent = 'Ver prévia da transcrição';
+      botao.dataset.previa = final;
+    } catch (err) {
+      pop.erro('Não foi possível transcrever. ' + frase(err.message));
+      botao.textContent = 'Transcrever vídeo';
+    } finally {
+      botao.disabled = false;
+    }
+  }
+
   function montarBotao(id, balao, video = false, nova = false) {
     const barra = document.createElement('div');
     barra.className = 'dm-tr' + (video ? ' dm-tr-video' : '');
@@ -227,7 +308,9 @@
     const area = document.createElement('div');
     botao.addEventListener('click', (e) => {
       e.stopPropagation();
-      transcrever(botao, area, id, video);
+      if (video && botao.dataset.previa) abrirPopupVideo().texto(botao.dataset.previa);
+      else if (video) transcreverVideo(botao, id);
+      else transcrever(botao, area, id);
     });
     barra.appendChild(botao);
     barra.appendChild(area);

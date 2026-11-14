@@ -112,3 +112,9 @@ test('ffmpeg ignora a faixa de vídeo (-vn) e extrai só o áudio', () => {
   assert.ok(args.includes('-vn'));
   assert.equal(args.indexOf('-vn') > args.indexOf('-i'), true);
 });
+
+test('ffmpeg: o limite corta o áudio nos primeiros N segundos (prévia de vídeo)', () => {
+  const com = buildFfmpegArgs('v.mp4', 'a.wav', 60);
+  assert.deepEqual(com.slice(com.indexOf('-t'), com.indexOf('-t') + 2), ['-t', '60']);
+  assert.equal(buildFfmpegArgs('v.mp4', 'a.wav').includes('-t'), false);
+});
