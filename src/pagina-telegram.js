@@ -137,9 +137,9 @@
 
   // O endereço /progressive/ só responde a pedidos com Range (é assim que o próprio player pede).
   // Baixa em pedaços até o fim do arquivo; com blob: o fetch devolve tudo de uma vez.
-  async function baixarVoz(url, id) {
+  async function baixarVoz(url, id, tipoPadrao = 'audio/ogg') {
     const partes = [];
-    let tipo = 'audio/ogg';
+    let tipo = tipoPadrao;
     let inicio = 0;
     let total = Infinity;
     try {
@@ -368,7 +368,7 @@
       }
     }
     if (!url) throw new Error('o vídeo ainda não carregou; toque nele uma vez e tente de novo');
-    return baixarVoz(url, id);
+    return baixarVoz(url, id, 'video/mp4');
   }
 
   async function transcreverVideo(botao, midia, id) {
@@ -418,18 +418,26 @@
     ref.insertAdjacentElement('afterend', barra);
   }
 
-  // Vários vídeos enviados juntos (álbum) ficam na mesma mensagem: cada vídeo ganha o próprio botão, numerado.
+  // Vídeos do Telegram Web A: o componente é um <div class="media-inner"> (não há classe "Video").
+  // É vídeo (e não foto) quando tem o <video> carregado ou a etiqueta de duração (.message-media-duration).
+  // Vídeo redondo usa .RoundVideo. Em álbum (vários enviados juntos) cada item tem id="album-media-<idDaMensagem>".
+  const SELETOR_VIDEO = '.media-inner, .RoundVideo';
+  function ehVideo(el) {
+    return !!el.querySelector('video, .message-media-duration') || el.classList.contains('RoundVideo');
+  }
+
   function varrerVideos() {
     if (!opcoes.videos) return;
-    for (const midia of document.querySelectorAll('.Video')) {
+    for (const midia of document.querySelectorAll(SELETOR_VIDEO)) {
       const linha = midia.closest('[data-message-id]');
-      if (!linha) continue;
-      const todos = [...linha.querySelectorAll('.Video')];
+      if (!linha || !ehVideo(midia)) continue;
+      const todos = [...linha.querySelectorAll(SELETOR_VIDEO)].filter(ehVideo);
       const indice = todos.indexOf(midia);
-      const id = todos.length > 1 ? `${linha.dataset.messageId}:${indice}` : linha.dataset.messageId;
+      const doAlbum = /^album-media-(\d+)/.exec(midia.id || '');
+      const id = doAlbum ? doAlbum[1] : (todos.length > 1 ? `${linha.dataset.messageId}:${indice}` : linha.dataset.messageId);
       if (linha.querySelector(`.dm-tr[data-dm-id="${CSS.escape(id)}"]`)) continue;
       // Álbum: os botões ficam juntos depois da grade; vídeo único: logo depois dele.
-      const alvo = (todos.length > 1 && linha.querySelector('.Album')) || midia.closest('.media-inner') || midia;
+      const alvo = (todos.length > 1 && linha.querySelector('.Album')) || midia;
       montarBotaoVideo(midia, alvo, id, todos.length > 1 ? indice + 1 : 0);
     }
   }
