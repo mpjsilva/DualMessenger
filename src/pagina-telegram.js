@@ -351,15 +351,15 @@
 
   // Vídeo: pega o endereço (blob: ou /progressive/) do <video> da própria mensagem e baixa o arquivo.
   // Se o vídeo ainda não carregou, aperta o controle de baixar/tocar uma vez e espera até 30 s.
-  async function obterVideo(linha, id) {
+  async function obterVideo(midia, id) {
     const achar = () => {
-      const v = linha.querySelector('video');
+      const v = midia.querySelector('video') || (midia.closest('.media-inner') && midia.closest('.media-inner').querySelector('video'));
       const url = v && (v.currentSrc || v.src);
       return url && (url.startsWith('blob:') || url.includes('/progressive/')) ? url : null;
     };
     let url = achar();
     if (!url) {
-      const controle = linha.querySelector('.Video .download-button, .Video .media-loading, .Video');
+      const controle = midia.querySelector('.download-button, .media-loading') || midia;
       if (controle) apertar(controle);
       const limite = Date.now() + 30000;
       while (!url && Date.now() < limite) {
@@ -371,13 +371,13 @@
     return baixarVoz(url, id);
   }
 
-  async function transcreverVideo(botao, linha, id) {
+  async function transcreverVideo(botao, midia, id) {
     botao.disabled = true;
     botao.textContent = 'Carregando vídeo…';
     const pop = abrirPopupVideo();
     pop.texto('Carregando o vídeo…');
     try {
-      const blob = await obterVideo(linha, id);
+      const blob = await obterVideo(midia, id);
       botao.textContent = 'Transcrevendo…';
       pop.texto('Transcrevendo…');
       const buffer = await blob.arrayBuffer();
@@ -391,37 +391,46 @@
       botao.dataset.previa = final;
     } catch (err) {
       pop.erro('Não foi possível transcrever. ' + frase(err.message));
-      botao.textContent = 'Transcrever vídeo';
+      botao.textContent = botao.dataset.rotulo || 'Transcrever vídeo';
     } finally {
       botao.disabled = false;
     }
   }
 
-  function montarBotaoVideo(linha, referencia) {
+  function montarBotaoVideo(midia, referencia, id, numero) {
     const barra = document.createElement('div');
     barra.className = 'dm-tr dm-tr-video';
+    barra.dataset.dmId = id;
     const botao = document.createElement('button');
     botao.type = 'button';
-    botao.textContent = 'Transcrever vídeo';
+    botao.textContent = numero ? `Transcrever vídeo ${numero}` : 'Transcrever vídeo';
+    botao.dataset.rotulo = botao.textContent;
     const area = document.createElement('div');
     botao.addEventListener('click', (e) => {
       e.stopPropagation();
       if (botao.dataset.previa) abrirPopupVideo().texto(botao.dataset.previa);
-      else transcreverVideo(botao, linha, linha.dataset.messageId);
+      else transcreverVideo(botao, midia, id);
     });
     barra.appendChild(botao);
     barra.appendChild(area);
-    referencia.insertAdjacentElement('afterend', barra);
+    let ref = referencia; // vários botões do mesmo álbum ficam em ordem, um depois do outro
+    while (ref.nextElementSibling && ref.nextElementSibling.classList.contains('dm-tr')) ref = ref.nextElementSibling;
+    ref.insertAdjacentElement('afterend', barra);
   }
 
+  // Vários vídeos enviados juntos (álbum) ficam na mesma mensagem: cada vídeo ganha o próprio botão, numerado.
   function varrerVideos() {
     if (!opcoes.videos) return;
     for (const midia of document.querySelectorAll('.Video')) {
       const linha = midia.closest('[data-message-id]');
-      if (!linha || linha.querySelector('.dm-tr')) continue;
-      // Figurinhas e GIFs animados não são vídeo com fala: só mídia dentro do balão da mensagem.
-      const alvo = midia.closest('.media-inner') || midia;
-      montarBotaoVideo(linha, alvo);
+      if (!linha) continue;
+      const todos = [...linha.querySelectorAll('.Video')];
+      const indice = todos.indexOf(midia);
+      const id = todos.length > 1 ? `${linha.dataset.messageId}:${indice}` : linha.dataset.messageId;
+      if (linha.querySelector(`.dm-tr[data-dm-id="${CSS.escape(id)}"]`)) continue;
+      // Álbum: os botões ficam juntos depois da grade; vídeo único: logo depois dele.
+      const alvo = (todos.length > 1 && linha.querySelector('.Album')) || midia.closest('.media-inner') || midia;
+      montarBotaoVideo(midia, alvo, id, todos.length > 1 ? indice + 1 : 0);
     }
   }
 

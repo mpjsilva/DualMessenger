@@ -292,19 +292,21 @@
       botao.dataset.previa = final;
     } catch (err) {
       pop.erro('Não foi possível transcrever. ' + frase(err.message));
-      botao.textContent = 'Transcrever vídeo';
+      botao.textContent = botao.dataset.rotulo || 'Transcrever vídeo';
     } finally {
       botao.disabled = false;
     }
   }
 
-  function montarBotao(id, balao, video = false, nova = false) {
+  function montarBotao(id, balao, video = false, nova = false, numero = 0) {
     const barra = document.createElement('div');
+    barra.dataset.dmId = id;
     barra.className = 'dm-tr' + (video ? ' dm-tr-video' : '');
     if (nova) barra.dataset.dmNova = '1';
     const botao = document.createElement('button');
     botao.type = 'button';
-    botao.textContent = video ? 'Transcrever vídeo' : 'Transcrever';
+    botao.textContent = video ? (numero ? `Transcrever vídeo ${numero}` : 'Transcrever vídeo') : 'Transcrever';
+    botao.dataset.rotulo = botao.textContent;
     const area = document.createElement('div');
     botao.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -354,19 +356,33 @@
   }
 
   // Vídeos: acha as mensagens de vídeo pelo tipo (módulos internos) e põe o botão no balão.
+  // Vídeos enviados juntos viram um álbum: uma mensagem 'album' com os vídeos como mensagens filhas
+  // (parentMsgKey = id do álbum). Cada filho ganha o próprio botão, numerado na ordem do álbum.
+  function filhosDoAlbum(m, album) {
+    const idAlbum = album.id && album.id._serialized;
+    return m.Msg._models
+      .filter((x) => x.type === 'video' && x.parentMsgKey && (x.parentMsgKey._serialized || x.parentMsgKey) === idAlbum)
+      .sort((a, b) => (a.t || 0) - (b.t || 0));
+  }
+
   function varrerVideos() {
     const m = modulosWA();
     if (!m || !opcoes.videos) return;
     for (const linha of document.querySelectorAll('[data-id]')) {
-      const meta = linha.querySelector('[data-testid="msg-meta"]');
-      if (!meta || linha.querySelector('.dm-tr')) continue;
       const id = linha.getAttribute('data-id');
       const msg = acharMensagem(m, id);
-      if (!msg || msg.type !== 'video') continue;
-      let balao = meta.parentElement;
+      if (!msg) continue;
+      const videos = msg.type === 'album' ? filhosDoAlbum(m, msg) : (msg.type === 'video' ? [msg] : []);
+      if (!videos.length) continue;
+      const meta = linha.querySelector('[data-testid="msg-meta"]');
+      let balao = (meta || linha).parentElement;
       while (balao && balao !== linha && !balao.querySelector('img, canvas, video')) balao = balao.parentElement;
-      if (!balao || balao === linha) balao = meta.parentElement;
-      if (balao) montarBotao(id, balao, true);
+      if (!balao || balao === linha) balao = meta ? meta.parentElement : linha;
+      videos.forEach((v, i) => {
+        const idVideo = v.id && v.id._serialized ? v.id._serialized : id;
+        if (linha.querySelector(`.dm-tr[data-dm-id="${CSS.escape(idVideo)}"]`)) return;
+        montarBotao(idVideo, balao, true, false, videos.length > 1 ? i + 1 : 0);
+      });
     }
   }
 
